@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MuniAI — Docs</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pako@2/dist/pako.min.js"></script>
+  <style>
+    /* ── Prose ─────────────────────────────────────────────────────────── */
+    #doc h1  { font-size:2rem; font-weight:700; margin:2rem 0 .75rem; color:#0f172a; line-height:1.2 }
+    #doc h2  { font-size:1.45rem; font-weight:600; margin:2.5rem 0 .6rem; padding-bottom:.5rem;
+               border-bottom:1px solid #e2e8f0; color:#1e293b }
+    #doc h3  { font-size:1.15rem; font-weight:600; margin:1.75rem 0 .4rem; color:#1e293b }
+    #doc h4  { font-size:1rem; font-weight:600; margin:1.25rem 0 .25rem; color:#334155 }
+    #doc p   { margin:.65rem 0; line-height:1.8; color:#334155 }
+    #doc ul  { list-style:disc;    padding-left:1.5rem; margin:.65rem 0 }
+    #doc ol  { list-style:decimal; padding-left:1.5rem; margin:.65rem 0 }
+    #doc li  { margin:.3rem 0; line-height:1.7; color:#374151 }
+    #doc blockquote { border-left:3px solid #94a3b8; padding:.5rem 1rem; color:#64748b;
+                      margin:1.25rem 0; background:#f8fafc; border-radius:0 .375rem .375rem 0 }
+    #doc a   { color:#3b82f6 } #doc a:hover { text-decoration:underline; color:#1d4ed8 }
+    #doc hr  { border:none; border-top:1px solid #e2e8f0; margin:2.5rem 0 }
+    #doc strong { font-weight:600; color:#1e293b }
+    #doc em     { font-style:italic; color:#475569 }
+    #doc table   { width:100%; border-collapse:collapse; margin:1.25rem 0; font-size:.875rem;
+                   border:1px solid #e2e8f0; border-radius:.5rem; overflow:hidden }
+    #doc th      { background:#f1f5f9; font-weight:600; text-align:left;
+                   padding:.6rem .875rem; border-bottom:2px solid #e2e8f0; color:#1e293b }
+    #doc td      { padding:.5rem .875rem; border-bottom:1px solid #f1f5f9; vertical-align:top }
+    #doc tr:last-child td { border-bottom:none }
+    #doc tr:hover td { background:#fafafa }
+    #doc :not(pre) > code { background:#f1f5f9; padding:.15rem .4rem; border-radius:.25rem;
+                             font-size:.82em; font-family:ui-monospace,monospace; color:#be185d }
+    /* ── Diagram card ──────────────────────────────────────────────────── */
+    .dc          { margin:1.75rem 0; border-radius:.75rem; border:1px solid #e2e8f0;
+                   overflow:hidden; box-shadow:0 2px 6px rgba(0,0,0,.05) }
+    .dc-body     { background:#fff; padding:1.5rem; display:flex; justify-content:center;
+                   align-items:flex-start; overflow-x:auto; min-height:72px }
+    .dc-body .mermaid     { width:100% }
+    .dc-body .mermaid svg { max-width:100%; height:auto; display:block; margin:0 auto }
+    .dc-body img { max-width:100%; height:auto; display:block; margin:0 auto }
+    .dc-src         { border-top:1px solid #f1f5f9 }
+    .dc-src summary { display:flex; align-items:center; justify-content:space-between;
+                      padding:.45rem 1rem; font-size:.72rem; color:#94a3b8; cursor:pointer;
+                      background:#f8fafc; list-style:none; user-select:none }
+    .dc-src summary::-webkit-details-marker { display:none }
+    .dc-src summary:hover { background:#f1f5f9; color:#64748b }
+    .dc-src[open] summary { border-bottom:1px solid #f1f5f9; color:#64748b }
+    .dc-src pre  { margin:0; padding:1rem 1.25rem; font-size:.72rem; background:#0f172a;
+                   color:#7dd3fc; overflow-x:auto; line-height:1.65;
+                   font-family:ui-monospace,monospace; white-space:pre }
+    .dc-bar { display:flex; align-items:center; justify-content:space-between;
+              padding:.45rem 1rem; background:#f8fafc; border-top:1px solid #f1f5f9 }
+    .ext-link { font-size:.72rem; font-weight:500; color:#3b82f6; text-decoration:none }
+    .ext-link:hover { color:#1d4ed8; text-decoration:underline }
+    .copy-btn { font-size:.7rem; background:none; border:1px solid #e2e8f0; border-radius:.25rem;
+                padding:.15rem .5rem; cursor:pointer; color:#94a3b8; font-family:inherit;
+                transition:all .15s }
+    .copy-btn:hover { border-color:#94a3b8; color:#475569 }
+    /* ── Skeleton ───────────────────────────────────────────────────────── */
+    .skel { background:linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%);
+            background-size:200% 100%; animation:shimmer 1.4s infinite;
+            border-radius:.375rem }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    /* ── Code blocks (non-diagram) ──────────────────────────────────────── */
+    .dc-pre { margin:1.25rem 0; border-radius:.6rem; background:#0f172a; overflow:hidden;
+              border:1px solid #1e293b }
+    .dc-pre pre { padding:1rem 1.25rem; font-size:.75rem; color:#a5f3fc; overflow-x:auto;
+                  line-height:1.65; font-family:ui-monospace,monospace; margin:0; white-space:pre }
+    /* ── Sidebar nav items ──────────────────────────────────────────────── */
+    .nav-btn { transition:background .12s, color .12s }
+    .nav-btn.active { background:#1e3a5f !important; color:#93c5fd !important }
+  </style>
+</head>
+<body class="flex h-screen bg-slate-950 text-slate-300 text-sm antialiased overflow-hidden">
+
+<!-- ══ Sidebar ══════════════════════════════════════════════════════════════ -->
+<aside class="flex flex-col border-r border-slate-800" style="width:220px;min-width:220px">
+  <div class="px-4 py-3.5 border-b border-slate-800">
+    <div class="text-white font-bold tracking-tight">MuniAI</div>
+    <div class="text-slate-500 text-xs mt-0.5">Architecture · Design Phase</div>
+  </div>
+
+  <nav id="nav" class="flex-1 overflow-y-auto py-2 px-2">
+    <span class="text-slate-600 text-xs px-2">Loading…</span>
+  </nav>
+
+  <div class="px-4 py-3 border-t border-slate-800 text-xs space-y-1.5">
+    <div class="text-slate-600">Serve locally:</div>
+    <code class="block bg-slate-900 border border-slate-800 text-slate-400 px-2 py-1 rounded font-mono text-xs leading-relaxed">
+      python -m http.server
+    </code>
+    <div class="text-slate-700">→ <a href="http://localhost:3000/docs/"
+         class="text-slate-600 hover:text-slate-400 underline">localhost:3000/docs/</a></div>
+  </div>
+</aside>
+
+<!-- ══ Main ══════════════════════════════════════════════════════════════════ -->
+<div class="flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-50">
+
+  <!-- Top bar -->
+  <header class="shrink-0 bg-white border-b border-slate-200 px-6 flex items-center justify-between"
+          style="height:42px">
+    <span id="tb-title" class="font-medium text-slate-600 truncate">Select a document</span>
+    <span id="tb-path"  class="text-slate-400 text-xs font-mono hidden sm:block"></span>
+  </header>
+
+  <!-- Content -->
+  <main class="flex-1 overflow-y-auto bg-white">
+    <div id="doc" class="max-w-3xl mx-auto px-10 py-8">
+      <p class="text-slate-400">← Select a document from the sidebar.</p>
+    </div>
+  </main>
+</div>
+
+<!-- ══ Script ══════════════════════════════════════════════════════════════ -->
+<script>
+mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose' });
+
+// ── Encoders ──────────────────────────────────────────────────────────────
+
+function encodePlantUML(src) {
+  const alpha = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_';
+  const bytes = pako.deflateRaw(new TextEncoder().encode(src), { level: 9 });
+  let out = '';
+  for (let i = 0; i < bytes.length; i += 3) {
+    const a = bytes[i] ?? 0, b = bytes[i+1] ?? 0, c = bytes[i+2] ?? 0;
+    out += alpha[a>>2] + alpha[((a&3)<<4)|(b>>4)] + alpha[((b&15)<<2)|(c>>6)] + alpha[c&63];
+  }
+  return out;
+}
+
+function mermaidLiveUrl(src) {
+  const json = JSON.stringify({ code: src, mermaid: { theme: 'default' } });
+  const comp = pako.deflate(new TextEncoder().encode(json));
+  let bin = ''; comp.forEach(b => (bin += String.fromCharCode(b)));
+  return 'https://mermaid.live/edit#pako:' + btoa(bin).replace(/\+/g,'-').replace(/\//g,'_');
+}
+
+// ── Clipboard ─────────────────────────────────────────────────────────────
+
+async function copyCode(btn, elId) {
+  const text = document.getElementById(elId)?.textContent ?? '';
+  await navigator.clipboard.writeText(text);
+  const prev = btn.textContent;
+  btn.textContent = 'Copied ✓';
+  btn.style.color = '#22c55e';
+  btn.style.borderColor = '#22c55e';
+  setTimeout(() => { btn.textContent = prev; btn.style.color = ''; btn.style.borderColor = ''; }, 1800);
+}
+
+// ── PlantUML image helpers ────────────────────────────────────────────────
+
+function pumlLoaded(imgId) {
+  document.getElementById(imgId + '-sk')?.remove();
+  const img = document.getElementById(imgId);
+  if (img) { img.style.display = 'block'; }
+}
+
+function pumlError(imgId) {
+  document.getElementById(imgId + '-sk')?.remove();
+  const img = document.getElementById(imgId);
+  if (img) {
+    const wrap = img.closest('.dc-body');
+    if (wrap) wrap.innerHTML =
+      '<p style="color:#f87171;font-size:.8rem;padding:.75rem 0">⚠ Diagram could not load — check internet connection or PlantUML syntax.</p>';
+  }
+}
+
+// ── Diagram card ──────────────────────────────────────────────────────────
+
+function diagCard(bodyHtml, srcCode, links) {
+  // links = [{ url, label }, ...]
+  const srcId   = 'src-' + Math.random().toString(36).slice(2,9);
+  const esc     = srcCode.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const linkHtml = links.map(l =>
+    `<a class="ext-link" href="${l.url}" target="_blank" rel="noopener noreferrer">↗ ${l.label}</a>`
+  ).join('');
+  return `
+<div class="dc">
+  <div class="dc-body">${bodyHtml}</div>
+  <details class="dc-src">
+    <summary>
+      <span>⌥ View source</span>
+      <button class="copy-btn" onclick="copyCode(this,'${srcId}')">Copy</button>
+    </summary>
+    <pre id="${srcId}">${esc}</pre>
+  </details>
+  <div class="dc-bar">${linkHtml}</div>
+</div>`;
+}
+
+// ── Marked renderer ───────────────────────────────────────────────────────
+
+marked.use({
+  renderer: {
+    code(src, lang) {
+      lang = (lang ?? '').split(/\s/)[0].toLowerCase();
+
+      /* ── Mermaid ── */
+      if (lang === 'mermaid') {
+        const safe = src.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        return diagCard(
+          `<div class="mermaid">${safe}</div>`,
+          src,
+          [{ url: mermaidLiveUrl(src), label: 'Open in Mermaid Live' }]
+        );
+      }
+
+      /* ── PlantUML ── renders inline as SVG image from plantuml.com ── */
+      if (lang === 'plantuml' || lang === 'puml') {
+        const enc   = encodePlantUML(src);
+        const svgUrl  = `https://www.plantuml.com/plantuml/svg/${enc}`;
+        const editUrl = `https://www.plantuml.com/plantuml/uml/${enc}`;
+        const imgId = 'puml-' + Math.random().toString(36).slice(2,9);
+        return diagCard(
+          `<div id="${imgId}-sk" class="skel" style="width:100%;height:200px"></div>
+           <img id="${imgId}" src="${svgUrl}" alt="PlantUML diagram" style="display:none"
+                onload="pumlLoaded('${imgId}')" onerror="pumlError('${imgId}')">`,
+          src,
+          [
+            { url: editUrl,                                         label: 'Open in PlantUML Online' },
+            { url: `https://editor.plantuml.com/uml/${enc}`,       label: 'Open in PlantUML Editor' }
+          ]
+        );
+      }
+
+      /* ── generic code block ── */
+      const esc = src.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      return `<div class="dc-pre"><pre><code>${esc}</code></pre></div>`;
+    }
+  }
+});
+
+// ── Sidebar ───────────────────────────────────────────────────────────────
+
+async function buildNav() {
+  const nav = document.getElementById('nav');
+  try {
+    const { files } = await fetch('./manifest.json').then(r => r.json());
+
+    const groups = new Map();
+    for (const f of files) {
+      const g = f.path.startsWith('../') ? '📄 root'
+              : f.path.includes('/')     ? f.path.split('/')[0]
+              : '';
+      if (!groups.has(g)) groups.set(g, []);
+      groups.get(g).push(f);
+    }
+
+    nav.innerHTML = [...groups].map(([g, items]) => `
+      ${g ? `<p class="px-2 pt-3 pb-0.5 text-xs font-semibold uppercase tracking-widest text-slate-600">${g}</p>` : ''}
+      ${items.map(f => `
+        <button data-path="${f.path}" onclick="openFile('${f.path}','${f.title}',this)"
+          class="nav-btn w-full text-left px-3 py-1.5 rounded text-xs text-slate-400
+                 hover:bg-slate-900 hover:text-slate-200 truncate">
+          ${f.title}
+        </button>`).join('')}
+    `).join('');
+
+    nav.querySelector('.nav-btn')?.click();
+  } catch {
+    nav.innerHTML = `<p class="text-red-500 text-xs px-2 leading-relaxed">
+      Cannot load manifest.json.<br>Serve over HTTP.</p>`;
+  }
+}
+
+// ── File loader ───────────────────────────────────────────────────────────
+
+async function openFile(path, title, btn) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  btn?.classList.add('active');
+
+  document.getElementById('tb-title').textContent = title || path;
+  document.getElementById('tb-path').textContent  = path;
+
+  const doc = document.getElementById('doc');
+  doc.innerHTML = [1,2,3].map(i =>
+    `<div class="skel" style="height:${i===2?160:20}px;margin:${i===1?'1.5rem':'.75rem'} 0"></div>`
+  ).join('');
+
+  try {
+    const res = await fetch('./' + path);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    const ext  = path.split('.').pop().toLowerCase();
+
+    if (ext === 'md') {
+      doc.innerHTML = marked.parse(text);
+      await mermaid.run({ nodes: doc.querySelectorAll('.mermaid') });
+
+    } else if (ext === 'uml' || ext === 'puml') {
+      const enc   = encodePlantUML(text);
+      const imgId = 'puml-file-' + Date.now();
+      doc.innerHTML = diagCard(
+        `<div id="${imgId}-sk" class="skel" style="width:100%;height:220px"></div>
+         <img id="${imgId}" src="https://www.plantuml.com/plantuml/svg/${enc}"
+              alt="PlantUML diagram" style="display:none"
+              onload="pumlLoaded('${imgId}')" onerror="pumlError('${imgId}')">`,
+        text,
+        [
+          { url: `https://www.plantuml.com/plantuml/uml/${enc}`, label: 'Open in PlantUML Online' },
+          { url: `https://editor.plantuml.com/uml/${enc}`,       label: 'Open in PlantUML Editor' }
+        ]
+      );
+
+    } else {
+      const esc = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      doc.innerHTML = `<pre class="text-xs bg-slate-900 text-slate-300 p-5 rounded-lg overflow-x-auto leading-relaxed font-mono">${esc}</pre>`;
+    }
+
+  } catch (err) {
+    debugger;
+    doc.innerHTML = `
+      <p class="text-red-500 font-semibold mb-2">Error: ${err.message}</p>
+      <p class="text-slate-400 text-xs">Run
+        <code class="bg-slate-100 px-1 rounded">python -m http.server</code>
+        in the repo root → open
+        <a class="text-blue-500 underline" href="http://localhost:3000/docs/">localhost:8000/docs/</a>
+      </p>`;
+  }
+}
+
+buildNav();
+</script>
+</body>
+</html>
