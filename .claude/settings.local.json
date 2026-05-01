@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-Content *And the OPERATION_LOG collection in the MongoDB update by consumer)",
+      "PowerShell(Invoke-WebRequest -Uri \"http://localhost:30001\" -UseBasicParsing | Select-Object -ExpandProperty StatusCode)"
+    ]
+  }
+}
