@@ -24,3 +24,6 @@ class InMemoryUserRepository(UserRepository):
 
     def find_by_email(self, email: str) -> Optional[User]:
         return next((u for u in self._store.values() if u.email == email), None)
+
+    def list_all(self) -> list[User]:
+        return list(self._store.values())

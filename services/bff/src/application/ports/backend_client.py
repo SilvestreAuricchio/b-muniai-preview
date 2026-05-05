@@ -8,3 +8,6 @@ class BackendClient(ABC):
 
     @abstractmethod
     def get(self, path: str, headers: dict) -> tuple[dict, int]: ...
+
+    @abstractmethod
+    def delete(self, path: str, headers: dict) -> tuple[dict, int]: ...

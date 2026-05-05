@@ -4,11 +4,12 @@ from src.domain.entities.user import UserRole, UserStatus
 from src.application.use_cases.create_user import CreateUserUseCase, CreateUserCommand
 from src.infrastructure.persistence.memory_user_repo import InMemoryUserRepository
 from src.infrastructure.messaging.noop_log_adapter import NoOpLogAdapter
+from src.infrastructure.cache.noop_otp_adapter import NoOpOTPAdapter
 
 
 @pytest.fixture
 def use_case():
-    return CreateUserUseCase(InMemoryUserRepository(), NoOpLogAdapter())
+    return CreateUserUseCase(InMemoryUserRepository(), NoOpLogAdapter(), NoOpOTPAdapter())
 
 
 def test_creates_user_with_pending_status(use_case):
@@ -17,12 +18,23 @@ def test_creates_user_with_pending_status(use_case):
         email="joao@hospital.com.br", role=UserRole.SA_ROOT,
         performed_by="system", correlation_id="test-cid",
     )
-    user = use_case.execute(cmd)
+    result = use_case.execute(cmd)
 
-    assert user.uuid
-    assert user.name == "João Silva"
-    assert user.status == UserStatus.PENDING
-    assert user.role == UserRole.SA_ROOT
+    assert result.user.uuid
+    assert result.user.name == "João Silva"
+    assert result.user.status == UserStatus.PENDING
+    assert result.user.role == UserRole.SA_ROOT
+
+
+def test_returns_otp_and_ttl(use_case):
+    cmd = CreateUserCommand(
+        name="A", telephone="+55", email="a@test.com",
+        role=UserRole.SA_ROOT, performed_by="psa-uuid", correlation_id="cid",
+    )
+    result = use_case.execute(cmd)
+    assert len(result.otp) == 6
+    assert result.otp.isdigit()
+    assert result.otp_ttl_seconds == 240
 
 
 def test_rejects_duplicate_email(use_case):
@@ -38,7 +50,7 @@ def test_rejects_duplicate_email(use_case):
 
 def test_publishes_log_event():
     log = MagicMock()
-    uc = CreateUserUseCase(InMemoryUserRepository(), log)
+    uc = CreateUserUseCase(InMemoryUserRepository(), log, NoOpOTPAdapter())
 
     uc.execute(CreateUserCommand(
         name="B", telephone="+55", email="b@test.com",

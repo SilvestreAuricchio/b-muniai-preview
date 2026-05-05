@@ -14,3 +14,7 @@ class HttpBackendClient(BackendClient):
     def get(self, path: str, headers: dict) -> tuple[dict, int]:
         r = requests.get(f"{self._base}{path}", headers=headers, timeout=self._timeout)
         return r.json(), r.status_code
+
+    def delete(self, path: str, headers: dict) -> tuple[dict, int]:
+        r = requests.delete(f"{self._base}{path}", headers=headers, timeout=self._timeout)
+        return r.json(), r.status_code

@@ -7,18 +7,18 @@ from src.application.ports.notification_port import NotificationPort
 
 
 @dataclass(frozen=True)
-class ActivateUserCommand:
-    uuid: str
-    otp: str
+class VerifyOTPCommand:
+    uuid:           str
+    otp:            str
     correlation_id: str
 
 
-class ActivateUserUseCase:
+class VerifyOTPUseCase:
     def __init__(
         self,
-        repo: UserRepository,
-        log: LogPort,
-        challenge: ChallengePort,
+        repo:         UserRepository,
+        log:          LogPort,
+        challenge:    ChallengePort,
         notification: NotificationPort,
     ) -> None:
         self._repo         = repo
@@ -26,7 +26,7 @@ class ActivateUserUseCase:
         self._challenge    = challenge
         self._notification = notification
 
-    def execute(self, cmd: ActivateUserCommand) -> User:
+    def execute(self, cmd: VerifyOTPCommand) -> User:
         user = self._repo.find_by_uuid(cmd.uuid)
         if user is None:
             raise LookupError(f"User not found: {cmd.uuid!r}")
@@ -35,11 +35,11 @@ class ActivateUserUseCase:
         if psa_uuid is None:
             raise ValueError("Invalid or expired OTP")
 
-        user.activate()
+        user.verify_otp()
         updated = self._repo.update(user)
         self._challenge.revoke(cmd.uuid)
 
-        self._notification.notify_activation(
+        self._notification.notify_otp_verified(
             psa_uuid=psa_uuid,
             user_uuid=updated.uuid,
             user_name=updated.name,
@@ -47,7 +47,7 @@ class ActivateUserUseCase:
         )
 
         self._log.publish(
-            action="ACTIVATE_USER",
+            action="VERIFY_OTP",
             entity_type="USER",
             entity_id=updated.uuid,
             performed_by=updated.uuid,

@@ -7,8 +7,13 @@ from prometheus_flask_exporter import PrometheusMetrics
 from src.infrastructure.persistence.memory_user_repo import InMemoryUserRepository
 from src.infrastructure.messaging.noop_log_adapter import NoOpLogAdapter
 from src.infrastructure.messaging.rabbitmq_log_adapter import RabbitMQLogAdapter
+from src.infrastructure.cache.noop_otp_adapter import NoOpOTPAdapter
+from src.infrastructure.cache.noop_notification_adapter import NoOpNotificationAdapter
 from src.application.use_cases.create_user import CreateUserUseCase
-from src.application.use_cases.activate_user import ActivateUserUseCase
+from src.application.use_cases.verify_otp import VerifyOTPUseCase
+from src.application.use_cases.approve_user import ApproveUserUseCase
+from src.application.use_cases.cancel_invitation import CancelInvitationUseCase
+from src.application.use_cases.list_users import ListUsersUseCase
 from src.infrastructure.http.middleware import register_middleware
 from src.infrastructure.http.blueprints.health import health_bp
 from src.infrastructure.http.blueprints.users import users_bp
@@ -27,14 +32,20 @@ def create_app() -> Flask:
     app = Flask(__name__)
 
     # --- Infrastructure ---
-    repo     = InMemoryUserRepository()
-    log_port = _build_log_adapter()
+    repo         = InMemoryUserRepository()
+    log_port     = _build_log_adapter()
+    challenge    = NoOpOTPAdapter()
+    notification = NoOpNotificationAdapter()
 
     # --- Use cases ---
     app.config["USE_CASES"] = {
-        "create_user":  CreateUserUseCase(repo, log_port),
-        "activate_user": ActivateUserUseCase(repo, log_port),
+        "list_users":        ListUsersUseCase(repo),
+        "create_user":       CreateUserUseCase(repo, log_port, challenge),
+        "verify_otp":        VerifyOTPUseCase(repo, log_port, challenge, notification),
+        "approve_user":      ApproveUserUseCase(repo, log_port),
+        "cancel_invitation": CancelInvitationUseCase(repo, log_port, challenge),
     }
+    app.config["NOTIFICATION_PORT"] = notification
 
     # --- Cross-cutting ---
     register_middleware(app)

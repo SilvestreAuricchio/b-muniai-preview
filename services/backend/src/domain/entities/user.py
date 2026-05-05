@@ -10,9 +10,10 @@ class UserRole(str, Enum):
 
 
 class UserStatus(str, Enum):
-    PENDING  = "pending"
-    ACTIVE   = "active"
-    INACTIVE = "inactive"
+    PENDING          = "pending"
+    PENDING_APPROVAL = "pending_approval"
+    ACTIVE           = "active"
+    INACTIVE         = "inactive"
 
 
 @dataclass
@@ -35,7 +36,17 @@ class User:
             status=UserStatus.PENDING,
         )
 
-    def activate(self) -> None:
+    def verify_otp(self) -> None:
         if self.status != UserStatus.PENDING:
-            raise ValueError(f"Cannot activate user with status '{self.status.value}'")
+            raise ValueError(f"OTP can only be verified for a pending user, current status: '{self.status.value}'")
+        self.status = UserStatus.PENDING_APPROVAL
+
+    def activate(self) -> None:
+        if self.status != UserStatus.PENDING_APPROVAL:
+            raise ValueError(f"Cannot activate user with status '{self.status.value}' — OTP must be verified first")
         self.status = UserStatus.ACTIVE
+
+    def deactivate(self) -> None:
+        if self.status not in (UserStatus.PENDING, UserStatus.PENDING_APPROVAL):
+            raise ValueError(f"Cannot cancel invitation with status '{self.status.value}'")
+        self.status = UserStatus.INACTIVE

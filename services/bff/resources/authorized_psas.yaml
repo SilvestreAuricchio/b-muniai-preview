@@ -1,0 +1,5 @@
+# Authorized Primary System Administrators
+# Only these Google-authenticated e-mails gain SA-root access
+psas:
+  - sauricchiopv@gmail.com
+  - thiago@muninai.com.br

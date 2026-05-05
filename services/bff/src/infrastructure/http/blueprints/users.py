@@ -10,9 +10,9 @@ def _backend():
 def _forward_headers() -> dict:
     return {
         "X-Correlation-ID": g.correlation_id,
-        "X-Auth-Sub": "demo-uuid",    # decoded from JWT in production
-        "X-Auth-Role": "SA-root",
-        "Content-Type": "application/json",
+        "X-Auth-Sub":       g.get("auth_sub",  ""),
+        "X-Auth-Role":      g.get("auth_role", ""),
+        "Content-Type":     "application/json",
     }
 
 
@@ -41,6 +41,19 @@ def create_user():
     return jsonify(body), status
 
 
+@users_bp.get("/users")
+def list_users():
+    """
+    List all users
+    ---
+    tags: [users]
+    responses:
+      200: {description: List of users}
+    """
+    body, status = _backend().get("/users", _forward_headers())
+    return jsonify(body), status
+
+
 @users_bp.post("/users/<uuid>/verify")
 def verify_user(uuid: str):
     """
@@ -63,4 +76,57 @@ def verify_user(uuid: str):
       404: {description: User not found}
     """
     body, status = _backend().post(f"/users/{uuid}/verify", request.get_json(silent=True) or {}, _forward_headers())
+    return jsonify(body), status
+
+
+@users_bp.post("/users/<uuid>/approve")
+def approve_user(uuid: str):
+    """
+    PSA approves invitee — activates the user (UC-01 Phase 3b)
+    ---
+    tags: [users]
+    parameters:
+      - in: path
+        name: uuid
+        required: true
+        type: string
+    responses:
+      201: {description: User activated}
+      404: {description: User not found}
+      422: {description: User has not verified OTP yet}
+    """
+    body, status = _backend().post(f"/users/{uuid}/approve", {}, _forward_headers())
+    return jsonify(body), status
+
+
+@users_bp.delete("/users/<uuid>/invitation")
+def cancel_invitation(uuid: str):
+    """
+    Cancel a pending invitation (PSA only)
+    ---
+    tags: [users]
+    parameters:
+      - in: path
+        name: uuid
+        required: true
+        type: string
+    responses:
+      200: {description: Invitation cancelled}
+      404: {description: User not found}
+      422: {description: User is not pending}
+    """
+    body, status = _backend().delete(f"/users/{uuid}/invitation", _forward_headers())
+    return jsonify(body), status
+
+
+@users_bp.get("/notifications")
+def get_notifications():
+    """
+    Poll PSA notifications (e.g. account activated)
+    ---
+    tags: [users]
+    responses:
+      200: {description: Pending notifications (consumed on read)}
+    """
+    body, status = _backend().get("/notifications", _forward_headers())
     return jsonify(body), status

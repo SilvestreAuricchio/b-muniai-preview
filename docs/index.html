@@ -73,12 +73,17 @@
     /* ── Sidebar nav items ──────────────────────────────────────────────── */
     .nav-btn { transition:background .12s, color .12s }
     .nav-btn.active { background:#1e3a5f !important; color:#93c5fd !important }
+    /* ── Quick links ────────────────────────────────────────────────────── */
+    .ql-link { display:block; padding:.2rem .75rem; border-radius:.375rem; font-size:.72rem;
+               color:#64748b; text-decoration:none; transition:background .1s, color .1s;
+               white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+    .ql-link:hover { background:#1e293b; color:#93c5fd }
   </style>
 </head>
 <body class="flex h-screen bg-slate-950 text-slate-300 text-sm antialiased overflow-hidden">
 
 <!-- ══ Sidebar ══════════════════════════════════════════════════════════════ -->
-<aside class="flex flex-col border-r border-slate-800" style="width:220px;min-width:220px">
+<aside class="flex flex-col border-r border-slate-800" style="width:240px;min-width:240px">
   <div class="px-4 py-3.5 border-b border-slate-800">
     <div class="text-white font-bold tracking-tight">MuniAI</div>
     <div class="text-slate-500 text-xs mt-0.5">Architecture · Design Phase</div>
@@ -88,8 +93,30 @@
     <span class="text-slate-600 text-xs px-2">Loading…</span>
   </nav>
 
-  <div class="px-4 py-3 border-t border-slate-800 text-xs space-y-1.5">
-    <div class="text-slate-600">Serve locally:</div>
+  <!-- Quick Links -->
+  <div class="border-t border-slate-800 px-3 py-2.5 text-xs space-y-0.5">
+    <p class="px-2 pb-1 text-xs font-semibold uppercase tracking-widest text-slate-600">Quick Links</p>
+
+    <p class="px-2 pt-1 pb-0.5 text-[10px] font-semibold uppercase tracking-widest text-slate-700">App</p>
+    <a href="https://localhost/"           target="_blank" class="ql-link">Dashboard</a>
+    <a href="https://localhost/crud/users" target="_blank" class="ql-link">User Management</a>
+
+    <p class="px-2 pt-1.5 pb-0.5 text-[10px] font-semibold uppercase tracking-widest text-slate-700">API Docs</p>
+    <a href="https://localhost/bff/apidocs" target="_blank" class="ql-link">BFF — Swagger</a>
+    <a href="https://localhost/api/apidocs" target="_blank" class="ql-link">Backend — Swagger</a>
+
+    <p class="px-2 pt-1.5 pb-0.5 text-[10px] font-semibold uppercase tracking-widest text-slate-700">Health</p>
+    <a href="https://localhost/bff/health" target="_blank" class="ql-link">BFF health</a>
+    <a href="https://localhost/api/health" target="_blank" class="ql-link">Backend health</a>
+
+    <p class="px-2 pt-1.5 pb-0.5 text-[10px] font-semibold uppercase tracking-widest text-slate-700">Infra</p>
+    <a href="https://localhost/rabbitmq/"  target="_blank" class="ql-link">RabbitMQ <span class="text-slate-600">(guest/guest)</span></a>
+    <a href="https://localhost/prometheus/" target="_blank" class="ql-link">Prometheus</a>
+    <a href="https://localhost/grafana/"   target="_blank" class="ql-link">Grafana <span class="text-slate-600">(admin/admin)</span></a>
+  </div>
+
+  <div class="px-4 py-2.5 border-t border-slate-800 text-xs space-y-1">
+    <div class="text-slate-600">Docs server:</div>
     <code class="block bg-slate-900 border border-slate-800 text-slate-400 px-2 py-1 rounded font-mono text-xs leading-relaxed">
       python -m http.server
     </code>
@@ -122,7 +149,13 @@ mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose
 
 // ── Encoders ──────────────────────────────────────────────────────────────
 
-function encodePlantUML(src) {
+function encodeKroki(src) {
+  const bytes = pako.deflate(new TextEncoder().encode(src));
+  let bin = ''; bytes.forEach(b => (bin += String.fromCharCode(b)));
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_');
+}
+
+function encodePlantUMLDotCom(src) {
   const alpha = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_';
   const bytes = pako.deflateRaw(new TextEncoder().encode(src), { level: 9 });
   let out = '';
@@ -157,32 +190,33 @@ async function copyCode(btn, elId) {
 function pumlLoaded(imgId) {
   document.getElementById(imgId + '-sk')?.remove();
   const img = document.getElementById(imgId);
-  if (img) { img.style.display = 'block'; }
+  if (!img) return;
+  img.style.display = 'block';
+  // collapse source now that image rendered successfully
+  const det = img.closest('.dc')?.querySelector('details.dc-src');
+  if (det) det.removeAttribute('open');
 }
 
 function pumlError(imgId) {
   document.getElementById(imgId + '-sk')?.remove();
   const img = document.getElementById(imgId);
-  if (img) {
-    const wrap = img.closest('.dc-body');
-    if (wrap) wrap.innerHTML =
-      '<p style="color:#f87171;font-size:.8rem;padding:.75rem 0">⚠ Diagram could not load — check internet connection or PlantUML syntax.</p>';
-  }
+  if (img) img.remove();
+  // source stays open — user can still read the diagram text
 }
 
-// ── Diagram card ──────────────────────────────────────────────────────────
+// ── Diagram card (open=true for PlantUML so source is always readable) ────
 
-function diagCard(bodyHtml, srcCode, links) {
-  // links = [{ url, label }, ...]
+function diagCard(bodyHtml, srcCode, links, srcOpenByDefault = false) {
   const srcId   = 'src-' + Math.random().toString(36).slice(2,9);
   const esc     = srcCode.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const linkHtml = links.map(l =>
     `<a class="ext-link" href="${l.url}" target="_blank" rel="noopener noreferrer">↗ ${l.label}</a>`
   ).join('');
+  const openAttr = srcOpenByDefault ? ' open' : '';
   return `
 <div class="dc">
   <div class="dc-body">${bodyHtml}</div>
-  <details class="dc-src">
+  <details class="dc-src" id="det-${srcId}"${openAttr}>
     <summary>
       <span>⌥ View source</span>
       <button class="copy-btn" onclick="copyCode(this,'${srcId}')">Copy</button>
@@ -210,21 +244,23 @@ marked.use({
         );
       }
 
-      /* ── PlantUML ── renders inline as SVG image from plantuml.com ── */
+      /* ── PlantUML ── source shown immediately; image loads async via Kroki ── */
       if (lang === 'plantuml' || lang === 'puml') {
-        const enc   = encodePlantUML(src);
-        const svgUrl  = `https://www.plantuml.com/plantuml/svg/${enc}`;
-        const editUrl = `https://www.plantuml.com/plantuml/uml/${enc}`;
+        const kEnc  = encodeKroki(src);
+        const pEnc  = encodePlantUMLDotCom(src);
         const imgId = 'puml-' + Math.random().toString(36).slice(2,9);
+        // diagCard assigns id="det-{srcId}" where srcId is generated inside diagCard,
+        // so we let pumlLoaded walk the DOM instead of guessing the id
         return diagCard(
-          `<div id="${imgId}-sk" class="skel" style="width:100%;height:200px"></div>
-           <img id="${imgId}" src="${svgUrl}" alt="PlantUML diagram" style="display:none"
-                onload="pumlLoaded('${imgId}')" onerror="pumlError('${imgId}')">`,
+          `<div id="${imgId}-sk" class="skel" style="width:100%;height:160px"></div>
+           <img id="${imgId}" src="https://kroki.io/plantuml/svg/${kEnc}" alt="PlantUML diagram" style="display:none"
+                onload="pumlLoaded('${imgId}',null)" onerror="pumlError('${imgId}')">`,
           src,
           [
-            { url: editUrl,                                         label: 'Open in PlantUML Online' },
-            { url: `https://editor.plantuml.com/uml/${enc}`,       label: 'Open in PlantUML Editor' }
-          ]
+            { url: `https://www.plantuml.com/plantuml/uml/${pEnc}`, label: 'Open in PlantUML Online' },
+            { url: `https://editor.plantuml.com/uml/${pEnc}`,       label: 'Open in PlantUML Editor' }
+          ],
+          true   // srcOpenByDefault — source always readable even if image fails
         );
       }
 
@@ -293,18 +329,20 @@ async function openFile(path, title, btn) {
       await mermaid.run({ nodes: doc.querySelectorAll('.mermaid') });
 
     } else if (ext === 'uml' || ext === 'puml') {
-      const enc   = encodePlantUML(text);
+      const kEnc  = encodeKroki(text);
+      const pEnc  = encodePlantUMLDotCom(text);
       const imgId = 'puml-file-' + Date.now();
       doc.innerHTML = diagCard(
         `<div id="${imgId}-sk" class="skel" style="width:100%;height:220px"></div>
-         <img id="${imgId}" src="https://www.plantuml.com/plantuml/svg/${enc}"
+         <img id="${imgId}" src="https://kroki.io/plantuml/svg/${kEnc}"
               alt="PlantUML diagram" style="display:none"
               onload="pumlLoaded('${imgId}')" onerror="pumlError('${imgId}')">`,
         text,
         [
-          { url: `https://www.plantuml.com/plantuml/uml/${enc}`, label: 'Open in PlantUML Online' },
-          { url: `https://editor.plantuml.com/uml/${enc}`,       label: 'Open in PlantUML Editor' }
-        ]
+          { url: `https://www.plantuml.com/plantuml/uml/${pEnc}`, label: 'Open in PlantUML Online' },
+          { url: `https://editor.plantuml.com/uml/${pEnc}`,       label: 'Open in PlantUML Editor' }
+        ],
+        true
       );
 
     } else {
@@ -313,7 +351,6 @@ async function openFile(path, title, btn) {
     }
 
   } catch (err) {
-    debugger;
     doc.innerHTML = `
       <p class="text-red-500 font-semibold mb-2">Error: ${err.message}</p>
       <p class="text-slate-400 text-xs">Run
