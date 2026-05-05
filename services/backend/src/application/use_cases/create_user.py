@@ -5,7 +5,7 @@ from src.application.ports.user_repository import UserRepository
 from src.application.ports.log_port import LogPort
 from src.application.ports.challenge_port import ChallengePort
 
-OTP_TTL_SECONDS = 240  # 4 minutes per spec
+OTP_TTL_SECONDS = 345_600  # 4 days per spec
 
 
 @dataclass(frozen=True)

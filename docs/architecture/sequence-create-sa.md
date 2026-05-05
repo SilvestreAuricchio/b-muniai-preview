@@ -1,7 +1,6 @@
 # UC-01: Create System Administrator — Sequence Diagram
 
-> **Bootstrap note:** the initial SA (`sa-0`) is seeded via IaC. All subsequent SAs are created by an existing SA-root through this flow.  
-> Tech stack is TBD — participants are logical, not implementation-bound.
+> **Bootstrap note:** the initial SA (`sa-0`) is seeded via IaC. All subsequent SAs are created by an existing SA-root through this flow.
 
 ---
 
@@ -10,13 +9,25 @@
 | Symbol | Meaning |
 |---|---|
 | **PSA** | Previous System Administrator — authenticated SA-root who initiates the creation |
-| **NSA** | New System Administrator — not yet a user; receives the challenge out-of-band |
+| **NSA** | New System Administrator — not yet a user; receives the OTP out-of-band |
 | **UI** | Frontend application |
 | **BFF** | Backend for Frontend — session validation, request forwarding |
 | **Backend** | Core API — business logic, authorization enforcement, OPERATION_LOG writes |
 | **Auth Service** | Issues and validates tokens; enforces RBAC via claims + PERMISSION table |
 | **Database** | Persists USER, OPERATION_LOG (same transaction) |
-| **Challenge Service** | Delivers OTP to NSA via email, WhatsApp, or SMS (channel TBD) |
+| **Challenge Service** | Publishes OTP to message queue; async consumer delivers via **email + WhatsApp + SMS** (all channels). Single-channel failure does not fail the flow. OTP TTL: **4 days**. |
+| **Notification Inbox** | In-memory (dev) / persistent (prod) per-PSA event inbox, polled by the UI |
+
+---
+
+## Resolved Decisions
+
+| # | Question | Answer |
+|---|---|---|
+| 1 | Default challenge channel? | **All channels** — email + WhatsApp + SMS dispatched asynchronously via message consumer to avoid single-channel unavailability failing the invitation |
+| 2 | Challenge TTL? | **4 days** (345 600 s) |
+| 3 | Does PSA receive notification when NSA activates? | **Yes** — `USER_OTP_VERIFIED` event when NSA verifies OTP (prompts PSA to approve); `USER_ACTIVATED` confirmation after PSA approves |
+| 4 | Can PSA cancel a pending invitation? | **Yes** — from both `pending` and `pending_approval` states |
 
 ---
 
@@ -33,6 +44,7 @@ sequenceDiagram
     participant Auth as Auth Service
     participant DB as Database
     participant Ch as Challenge Service
+    participant NI as Notification Inbox
 
     rect rgb(241,245,249)
         Note over PSA,Auth: Phase 1 — PSA Session Validation
@@ -46,37 +58,55 @@ sequenceDiagram
     end
 
     rect rgb(240,253,244)
-        Note over PSA,Ch: Phase 2 — Create New SA
-        PSA->>UI: Fill form (name, telephone, e-mail)
+        Note over PSA,Ch: Phase 2 — Invite New SA
+        PSA->>UI: Fill form (name, telephone, e-mail, role)
         UI->>BFF: POST /users {name, telephone, email, role: SA-root}
         BFF->>BE: Forward request + PSA claims
         BE->>Auth: Check PERMISSION {SA-root, USER, CREATE}
         Auth-->>BE: Authorized
         BE->>DB: INSERT user {UUID, name, telephone, email, status: pending, role: SA-root}
         DB-->>BE: Row created {UUID}
-        BE->>DB: INSERT operation_log {CREATE_USER, performedBy: PSA-UUID, entityId: USER-UUID, payload}
+        BE->>DB: INSERT operation_log {CREATE_USER, performedBy: PSA-UUID}
         DB-->>BE: Logged
-        BE->>Ch: Issue challenge {UUID, email, telephone}
-        Ch-->>NSA: Deliver OTP (email / WhatsApp / SMS)
+        BE->>Ch: issue_challenge {UUID, email, telephone, otp, ttl: 4 days}
+        Ch-->>NSA: OTP delivered via email + WhatsApp + SMS (async consumer)
         BE-->>BFF: 202 Accepted {uuid, status: pending}
         BFF-->>UI: Invitation sent
         UI-->>PSA: Confirmation displayed
     end
 
     rect rgb(255,251,235)
-        Note over NSA,DB: Phase 3 — NSA Verifies Challenge
+        Note over NSA,NI: Phase 3a — NSA Verifies OTP
         NSA->>UI: Submit OTP code
         UI->>BFF: POST /users/{uuid}/verify {otp}
         BFF->>BE: Forward verification
-        BE->>Ch: Verify OTP {uuid, otp}
-        Ch-->>BE: Valid
-        BE->>DB: UPDATE user SET status=active WHERE uuid=UUID
+        BE->>Ch: verify_otp {uuid, otp}
+        Ch-->>BE: Valid + psa_uuid
+        BE->>DB: UPDATE user SET status = pending_approval WHERE uuid = UUID
         DB-->>BE: Updated
-        BE->>DB: INSERT operation_log {ACTIVATE_USER, performedBy: USER-UUID, entityId: USER-UUID}
+        BE->>DB: INSERT operation_log {VERIFY_OTP, performedBy: USER-UUID}
         DB-->>BE: Logged
-        BE-->>BFF: 201 Created
-        BFF-->>UI: Render success
-        UI-->>NSA: Account activated
+        BE->>NI: push USER_OTP_VERIFIED → PSA inbox
+        BE-->>BFF: 200 OK {status: pending_approval}
+        BFF-->>UI: Awaiting PSA approval
+        UI-->>NSA: Verification successful — awaiting approval
+    end
+
+    rect rgb(240,253,244)
+        Note over PSA,NI: Phase 3b — PSA Approves
+        NI-->>UI: USER_OTP_VERIFIED event (polled)
+        UI-->>PSA: "NSA verified OTP — click Approve"
+        PSA->>UI: Click Approve
+        UI->>BFF: POST /users/{uuid}/approve
+        BFF->>BE: Forward + PSA claims
+        BE->>DB: UPDATE user SET status = active WHERE uuid = UUID
+        DB-->>BE: Updated
+        BE->>DB: INSERT operation_log {APPROVE_USER, performedBy: PSA-UUID}
+        DB-->>BE: Logged
+        BE->>NI: push USER_ACTIVATED → PSA inbox (confirmation)
+        BE-->>BFF: 201 Created {status: active}
+        BFF-->>UI: User activated
+        UI-->>PSA: Confirmation — NSA is now active
     end
 ```
 
@@ -102,7 +132,8 @@ participant "BFF"            as BFF
 participant "Backend"        as BE
 participant "Auth Service"   as Auth
 database    "Database"       as DB
-participant "Challenge\nService" as Ch
+participant "Challenge\nService"      as Ch
+participant "Notification\nInbox"     as NI
 
 autonumber
 
@@ -116,44 +147,66 @@ Auth --> BE   : Valid · role: SA-root\nsub: PSA-UUID
 BE   --> BFF  : 200 OK {PSA context}
 BFF  --> UI   : Render Admin Panel
 
-== Phase 2: Create New SA ==
+== Phase 2: Invite New SA ==
 
-PSA  ->  UI   : Fill form\n(name, telephone, e-mail)
-UI   ->  BFF  : POST /users\n{name, telephone, email,\nrole: SA-root}
+PSA  ->  UI   : Fill form\n(name, telephone, e-mail, role)
+UI   ->  BFF  : POST /users\n{name, telephone, email, role: SA-root}
 BFF  ->  BE   : Forward request + PSA claims
 BE   ->  Auth : Check PERMISSION\n{SA-root, USER, CREATE}
 Auth --> BE   : Authorized
 
-BE   ->  DB   : INSERT user\n{UUID, name, telephone,\nemail, status: pending,\nrole: SA-root}
+BE   ->  DB   : INSERT user\n{UUID, name, telephone, email,\nstatus: pending, role: SA-root}
 DB   --> BE   : Row created {UUID}
 
-BE   ->  DB   : INSERT operation_log\n{CREATE_USER, performedBy: PSA-UUID,\nentityId: USER-UUID, payload}
+BE   ->  DB   : INSERT operation_log\n{CREATE_USER, performedBy: PSA-UUID,\nentityId: USER-UUID}
 DB   --> BE   : Logged
 
-BE   ->  Ch   : Issue challenge\n{UUID, email, telephone}
-Ch   --> NSA  : Deliver OTP\n(email / WhatsApp / SMS)
+BE   ->  Ch   : issue_challenge\n{UUID, email, telephone, otp,\nttl: 4 days}
+Ch   --> NSA  : OTP via email + WhatsApp + SMS\n(async consumer — all channels)
 
 BE   --> BFF  : 202 Accepted\n{uuid, status: pending}
 BFF  --> UI   : Invitation sent
 UI   --> PSA  : Confirmation displayed
 
-== Phase 3: NSA Verifies Challenge ==
+== Phase 3a: NSA Verifies OTP ==
 
 NSA  ->  UI   : Submit OTP code
 UI   ->  BFF  : POST /users/{uuid}/verify\n{otp}
 BFF  ->  BE   : Forward verification
-BE   ->  Ch   : Verify OTP {uuid, otp}
-Ch   --> BE   : Valid
+BE   ->  Ch   : verify_otp {uuid, otp}
+Ch   --> BE   : Valid + psa_uuid
+
+BE   ->  DB   : UPDATE user\nSET status = pending_approval\nWHERE uuid = UUID
+DB   --> BE   : Updated
+
+BE   ->  DB   : INSERT operation_log\n{VERIFY_OTP, performedBy: USER-UUID,\nentityId: USER-UUID}
+DB   --> BE   : Logged
+
+BE   ->  NI   : push USER_OTP_VERIFIED\n→ PSA inbox
+
+BE   --> BFF  : 200 OK {status: pending_approval}
+BFF  --> UI   : Awaiting PSA approval
+UI   --> NSA  : Verification successful\n— awaiting approval
+
+== Phase 3b: PSA Approves ==
+
+NI   --> UI   : USER_OTP_VERIFIED event (polled)
+UI   --> PSA  : "NSA verified OTP — click Approve"
+PSA  ->  UI   : Click Approve
+UI   ->  BFF  : POST /users/{uuid}/approve
+BFF  ->  BE   : Forward + PSA claims
 
 BE   ->  DB   : UPDATE user\nSET status = active\nWHERE uuid = UUID
 DB   --> BE   : Updated
 
-BE   ->  DB   : INSERT operation_log\n{ACTIVATE_USER, performedBy: USER-UUID,\nentityId: USER-UUID}
+BE   ->  DB   : INSERT operation_log\n{APPROVE_USER, performedBy: PSA-UUID,\nentityId: USER-UUID}
 DB   --> BE   : Logged
 
-BE   --> BFF  : 201 Created
-BFF  --> UI   : Render success
-UI   --> NSA  : Account activated
+BE   ->  NI   : push USER_ACTIVATED\n→ PSA inbox (confirmation)
+
+BE   --> BFF  : 201 Created {status: active}
+BFF  --> UI   : User activated
+UI   --> PSA  : Confirmation — NSA is now active
 
 @enduml
 ```
@@ -169,15 +222,6 @@ UI   --> NSA  : Account activated
 | `telephone` | string | Used for WhatsApp / SMS challenge delivery |
 | `email` | string | Used for email OTP challenge and login |
 | `role` | enum | `SA-root` · `Scheduler` · `Mediciner` (extensible) |
-| `status` | enum | `pending` → `active` → `inactive` |
+| `status` | enum | `pending` → `pending_approval` → `active` → `inactive` |
 
 > The `uuid` is embedded in JWT claims and in every `OPERATION_LOG` entry, providing a traceable identity for all platform actions.
-
-## Open Decisions
-
-| # | Question |
-|---|---|
-| 1 | Which challenge channel is the default: email OTP, WhatsApp, or SMS? |
-| 2 | Challenge TTL (expiry of the OTP code)? |
-| 3 | Does PSA receive a notification when NSA activates the account? |
-| 4 | Can PSA cancel / revoke a pending invitation? |

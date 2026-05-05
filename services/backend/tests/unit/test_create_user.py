@@ -34,7 +34,7 @@ def test_returns_otp_and_ttl(use_case):
     result = use_case.execute(cmd)
     assert len(result.otp) == 6
     assert result.otp.isdigit()
-    assert result.otp_ttl_seconds == 240
+    assert result.otp_ttl_seconds == 345_600  # 4 days
 
 
 def test_rejects_duplicate_email(use_case):

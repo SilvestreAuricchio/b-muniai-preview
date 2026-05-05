@@ -1,7 +1,9 @@
 """
 Two-phase activation tests:
-  Phase 3a — invitee verifies OTP → pending_approval  (VerifyOTPUseCase)
+  Phase 3a — invitee verifies OTP  → pending_approval  (VerifyOTPUseCase)
+             PSA notified with USER_OTP_VERIFIED
   Phase 3b — PSA approves          → active            (ApproveUserUseCase)
+             PSA notified with USER_ACTIVATED (confirmation)
 """
 import pytest
 from src.domain.entities.user import UserRole, UserStatus
@@ -35,8 +37,8 @@ def verify_uc(repo, challenge, notification):
     return VerifyOTPUseCase(repo, NoOpLogAdapter(), challenge, notification)
 
 @pytest.fixture
-def approve_uc(repo):
-    return ApproveUserUseCase(repo, NoOpLogAdapter())
+def approve_uc(repo, notification):
+    return ApproveUserUseCase(repo, NoOpLogAdapter(), notification)
 
 @pytest.fixture
 def pending(create_uc):
@@ -98,3 +100,16 @@ def test_approve_raises_if_otp_not_verified(approve_uc, pending):
 def test_approve_raises_for_unknown_uuid(approve_uc):
     with pytest.raises(LookupError):
         approve_uc.execute(ApproveUserCommand(uuid="nope", performed_by="p", correlation_id="c"))
+
+
+def test_approve_notifies_psa_with_activated_event(verify_uc, approve_uc, pending, notification):
+    verify_uc.execute(VerifyOTPCommand(
+        uuid=pending.user.uuid, otp=pending.otp, correlation_id="cid-v",
+    ))
+    notification.pop_for_psa("psa-uuid")  # consume the OTP_VERIFIED event first
+    approve_uc.execute(ApproveUserCommand(
+        uuid=pending.user.uuid, performed_by="psa-uuid", correlation_id="cid-a",
+    ))
+    events = notification.pop_for_psa("psa-uuid")
+    assert len(events) == 1
+    assert events[0]["type"] == "USER_ACTIVATED"

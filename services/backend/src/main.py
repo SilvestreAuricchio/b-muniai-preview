@@ -42,7 +42,7 @@ def create_app() -> Flask:
         "list_users":        ListUsersUseCase(repo),
         "create_user":       CreateUserUseCase(repo, log_port, challenge),
         "verify_otp":        VerifyOTPUseCase(repo, log_port, challenge, notification),
-        "approve_user":      ApproveUserUseCase(repo, log_port),
+        "approve_user":      ApproveUserUseCase(repo, log_port, notification),
         "cancel_invitation": CancelInvitationUseCase(repo, log_port, challenge),
     }
     app.config["NOTIFICATION_PORT"] = notification

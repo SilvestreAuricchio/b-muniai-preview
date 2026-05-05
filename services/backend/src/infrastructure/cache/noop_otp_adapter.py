@@ -6,7 +6,11 @@ _log = logging.getLogger(__name__)
 
 
 class NoOpOTPAdapter(ChallengePort):
-    """In-memory OTP store with stdout delivery (channel = None). Dev only."""
+    """
+    In-memory OTP store for dev/test.
+    Production: replace with RabbitMQOTPPublisher (stores in Redis; dispatches
+    via async consumer to email + WhatsApp + SMS).
+    """
 
     def __init__(self) -> None:
         self._store: dict[str, dict] = {}
@@ -18,7 +22,8 @@ class NoOpOTPAdapter(ChallengePort):
             "expiry":   time.monotonic() + ttl_seconds,
         }
         _log.info(
-            "CHALLENGE issued uuid=%s email=%s otp=%s ttl=%ds",
+            "CHALLENGE issued uuid=%s email=%s otp=%s ttl=%ds "
+            "[dev: would dispatch to email+WhatsApp+SMS via async consumer]",
             uuid, email, otp, ttl_seconds,
         )
 
