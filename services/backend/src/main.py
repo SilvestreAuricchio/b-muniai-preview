@@ -9,6 +9,7 @@ from src.infrastructure.messaging.noop_log_adapter import NoOpLogAdapter
 from src.infrastructure.messaging.rabbitmq_log_adapter import RabbitMQLogAdapter
 from src.infrastructure.cache.noop_otp_adapter import NoOpOTPAdapter
 from src.infrastructure.cache.noop_notification_adapter import NoOpNotificationAdapter
+from src.infrastructure.cache.rabbitmq_otp_publisher import RabbitMQOTPPublisher
 from src.application.use_cases.create_user import CreateUserUseCase
 from src.application.use_cases.verify_otp import VerifyOTPUseCase
 from src.application.use_cases.approve_user import ApproveUserUseCase
@@ -28,13 +29,21 @@ def _build_log_adapter():
     return NoOpLogAdapter()
 
 
+def _build_challenge_adapter():
+    amqp_url  = os.getenv("RABBITMQ_URL")
+    redis_url = os.getenv("REDIS_URL")
+    if amqp_url and redis_url:
+        return RabbitMQOTPPublisher(amqp_url, redis_url)
+    return NoOpOTPAdapter()
+
+
 def create_app() -> Flask:
     app = Flask(__name__)
 
     # --- Infrastructure ---
     repo         = InMemoryUserRepository()
     log_port     = _build_log_adapter()
-    challenge    = NoOpOTPAdapter()
+    challenge    = _build_challenge_adapter()
     notification = NoOpNotificationAdapter()
 
     # --- Use cases ---

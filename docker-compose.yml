@@ -72,6 +72,18 @@ services:
       - muniai
     restart: unless-stopped
 
+  otp-dispatcher:
+    build: ./services/backend
+    command: python -m src.infrastructure.messaging.otp_dispatcher_consumer
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - muniai
+    restart: unless-stopped
+
   # log-consumer:                     # TODO: scaffold services/log-consumer
   #   build: ./services/log-consumer
   #   environment:
