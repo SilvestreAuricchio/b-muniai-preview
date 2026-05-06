@@ -1,0 +1,9 @@
+{
+  "files": [
+    { "title": "Architectural Proposal",        "path": "../Notes.md" },
+    { "title": "C4 — Admin Context (Phase 1)",  "path": "architecture/c4-phase1-admin.md" },
+    { "title": "C4 — Full Context + Containers","path": "architecture/c4-diagrams.md" },
+    { "title": "Domain Model",                  "path": "architecture/domain-model.md" },
+    { "title": "UC-01: Create System Admin",    "path": "architecture/sequence-create-sa.md" }
+  ]
+}

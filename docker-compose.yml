@@ -1,0 +1,210 @@
+name: muniai
+
+services:
+
+  # ── Gateway (only service with external ports) ─────────────────────────
+  nginx:
+    build: ./infra/nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - nginx_certs:/etc/nginx/certs
+    depends_on:
+      - web
+      - bff
+      - backend
+      - rabbitmq
+      - grafana
+      - prometheus
+    networks:
+      - muniai
+    restart: unless-stopped
+
+  # ── Application services (internal only) ───────────────────────────────
+  web:
+    build: ./services/web
+    expose:
+      - "30000"
+    networks:
+      - muniai
+    restart: unless-stopped
+
+  bff:
+    build: ./services/bff
+    expose:
+      - "30001"
+    env_file:
+      - path: ./services/bff/.env
+        required: false
+    environment:
+      PORT: "30001"
+      BACKEND_URL: http://backend:30002
+      REDIS_URL: redis://redis:6379/1
+      GOOGLE_REDIRECT_URI: "https://localhost/bff/auth/google/callback"
+      APP_URL: "https://localhost"
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks:
+      - muniai
+    restart: unless-stopped
+
+  backend:
+    build: ./services/backend
+    expose:
+      - "30002"
+    environment:
+      PORT: "30002"
+      POSTGRES_URL: postgresql://muniai:muniai@postgres:5432/muniai
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      REDIS_URL: redis://redis:6379/0
+      MONGODB_URL: mongodb://mongodb:27017/muniai
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_started
+    networks:
+      - muniai
+    restart: unless-stopped
+
+  otp-dispatcher:
+    build: ./services/backend
+    command: python -m src.infrastructure.messaging.otp_dispatcher_consumer
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      # SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM
+      # are read from .env — leave blank here to avoid overriding
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - muniai
+    restart: unless-stopped
+
+  # log-consumer:                     # TODO: scaffold services/log-consumer
+  #   build: ./services/log-consumer
+  #   environment:
+  #     RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+  #     MONGODB_URL: mongodb://mongodb:27017/muniai
+  #   depends_on:
+  #     rabbitmq: { condition: service_healthy }
+  #     mongodb:  { condition: service_started }
+  #   networks: [muniai]
+  #   restart: unless-stopped
+
+  # ── Data stores (standard ports, internal only) ────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    expose:
+      - "5432"
+    environment:
+      POSTGRES_DB:       muniai
+      POSTGRES_USER:     muniai
+      POSTGRES_PASSWORD: muniai
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -q -U muniai"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    networks:
+      - muniai
+
+  mongodb:
+    image: mongo:7
+    expose:
+      - "27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - muniai
+
+  redis:
+    image: redis:7-alpine
+    expose:
+      - "6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    networks:
+      - muniai
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    expose:
+      - "5672"
+      - "15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+    networks:
+      - muniai
+
+  # ── Observability ───────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    expose:
+      - "9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--web.external-url=/prometheus/"
+      - "--web.route-prefix=/"
+    networks:
+      - muniai
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    expose:
+      - "3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SERVER_ROOT_URL:            "https://localhost/grafana/"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_SERVER_DOMAIN:              "localhost"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - muniai
+
+# ── Named volumes ───────────────────────────────────────────────────────
+volumes:
+  nginx_certs:
+  postgres_data:
+  mongodb_data:
+  redis_data:
+  rabbitmq_data:
+  prometheus_data:
+  grafana_data:
+
+# ── Network ─────────────────────────────────────────────────────────────
+networks:
+  muniai:
+    driver: bridge

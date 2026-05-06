@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-Content *And the OPERATION_LOG collection in the MongoDB update by consumer)",
+      "PowerShell(Invoke-WebRequest -Uri \"http://localhost:30001\" -UseBasicParsing | Select-Object -ExpandProperty StatusCode)",
+      "PowerShell(New-Item *)",
+      "Bash(docker compose exec *)",
+      "Bash(python -m pytest tests/ -v)",
+      "Bash(docker compose *)",
+      "Bash(curl *)",
+      "Bash(python -m pytest tests/unit/ -v)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\porco\\\\tests\\\\b-muniai-preview\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(xargs grep -l \"activation\\\\|otp\")"
+    ]
+  }
+}
