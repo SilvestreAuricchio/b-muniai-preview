@@ -1,6 +1,8 @@
+import logging
 from flask import Blueprint, request, jsonify, g, current_app
 
 users_bp = Blueprint("users", __name__)
+_log      = logging.getLogger(__name__)
 
 
 def _backend():
@@ -37,7 +39,10 @@ def create_user():
       400: {description: Validation error}
       409: {description: Email already registered}
     """
-    body, status = _backend().post("/users", request.get_json(silent=True) or {}, _forward_headers())
+    payload = request.get_json(silent=True) or {}
+    _log.info("POST /users  corr=%s  payload=%s", g.correlation_id, payload)
+    body, status = _backend().post("/users", payload, _forward_headers())
+    _log.info("POST /users  corr=%s  → status=%s  response=%s", g.correlation_id, status, body)
     return jsonify(body), status
 
 
@@ -75,7 +80,9 @@ def verify_user(uuid: str):
       201: {description: User activated}
       404: {description: User not found}
     """
-    body, status = _backend().post(f"/users/{uuid}/verify", request.get_json(silent=True) or {}, _forward_headers())
+    payload = request.get_json(silent=True) or {}
+    _log.info("POST /users/%s/verify  corr=%s", uuid, g.correlation_id)
+    body, status = _backend().post(f"/users/{uuid}/verify", payload, _forward_headers())
     return jsonify(body), status
 
 
@@ -95,6 +102,7 @@ def approve_user(uuid: str):
       404: {description: User not found}
       422: {description: User has not verified OTP yet}
     """
+    _log.info("POST /users/%s/approve  corr=%s", uuid, g.correlation_id)
     body, status = _backend().post(f"/users/{uuid}/approve", {}, _forward_headers())
     return jsonify(body), status
 
@@ -115,6 +123,7 @@ def cancel_invitation(uuid: str):
       404: {description: User not found}
       422: {description: User is not pending}
     """
+    _log.info("DELETE /users/%s/invitation  corr=%s", uuid, g.correlation_id)
     body, status = _backend().delete(f"/users/{uuid}/invitation", _forward_headers())
     return jsonify(body), status
 

@@ -1,3 +1,4 @@
+import logging
 from flask import Blueprint, request, jsonify, g, current_app
 from src.domain.entities.user import UserRole, UserStatus
 from src.application.use_cases.create_user import CreateUserCommand
@@ -6,6 +7,7 @@ from src.application.use_cases.approve_user import ApproveUserCommand
 from src.application.use_cases.cancel_invitation import CancelInvitationCommand
 
 users_bp = Blueprint("users", __name__)
+_log      = logging.getLogger(__name__)
 
 
 def _uc(name: str):
@@ -97,6 +99,8 @@ def create_user():
     email     = (body.get("email") or "").strip()
     role_str  = (body.get("role") or "").strip()
 
+    _log.info("POST /users  corr=%s  payload=%s", g.correlation_id, body)
+
     if not all([name, telephone, email, role_str]):
         return jsonify(error="name, telephone, email, role are required"), 400
 
@@ -113,6 +117,9 @@ def create_user():
         ))
     except ValueError as exc:
         return jsonify(error=str(exc)), 409
+    except Exception as exc:
+        _log.exception("Unexpected error creating user  corr=%s", g.correlation_id)
+        return jsonify(error=f"Internal server error: {type(exc).__name__}"), 500
 
     return jsonify(
         uuid=result.user.uuid,
@@ -158,6 +165,9 @@ def verify_user(uuid: str):
         return jsonify(error="user not found"), 404
     except ValueError as exc:
         return jsonify(error=str(exc)), 422
+    except Exception as exc:
+        _log.exception("Unexpected error verifying OTP uuid=%s  corr=%s", uuid, g.correlation_id)
+        return jsonify(error=f"Internal server error: {type(exc).__name__}"), 500
 
     return jsonify(_user_dict(user)), 200
 
@@ -188,6 +198,9 @@ def approve_user(uuid: str):
         return jsonify(error="user not found"), 404
     except ValueError as exc:
         return jsonify(error=str(exc)), 422
+    except Exception as exc:
+        _log.exception("Unexpected error approving user uuid=%s  corr=%s", uuid, g.correlation_id)
+        return jsonify(error=f"Internal server error: {type(exc).__name__}"), 500
 
     return jsonify(_user_dict(user)), 201
 
@@ -218,6 +231,9 @@ def cancel_invitation(uuid: str):
         return jsonify(error="user not found"), 404
     except ValueError as exc:
         return jsonify(error=str(exc)), 422
+    except Exception as exc:
+        _log.exception("Unexpected error cancelling invitation uuid=%s  corr=%s", uuid, g.correlation_id)
+        return jsonify(error=f"Internal server error: {type(exc).__name__}"), 500
 
     return jsonify(_user_dict(user)), 200
 
