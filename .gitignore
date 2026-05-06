@@ -1,1 +1,8 @@
 .claude/english-feedback-coach.md
+
+# Secrets — never commit
+.env
+services/bff/.env
+infra/docker/certs/
+**/__pycache__/
+**/*.pyc
