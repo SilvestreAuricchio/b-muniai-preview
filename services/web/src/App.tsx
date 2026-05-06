@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from '@/shared/context/AuthContext'
 import { Shell } from '@/shell/Shell'
 import { Dashboard } from '@/dashboard/Dashboard'
 import { LoginPage } from '@/shell/LoginPage'
+import { ActivatePage } from '@/shell/ActivatePage'
 
 const Reports        = lazy(() => import('@/modules/reports/Reports').then((m) => ({ default: m.Reports })))
 const Crud           = lazy(() => import('@/modules/crud/Crud').then((m) => ({ default: m.Crud })))
@@ -59,7 +60,12 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <AppContent />
+        <Routes>
+          {/* Public — no auth required */}
+          <Route path="/activate/:uuid" element={<ActivatePage />} />
+          {/* Everything else — auth guard inside AppContent */}
+          <Route path="/*" element={<AppContent />} />
+        </Routes>
       </BrowserRouter>
     </AuthProvider>
   )

@@ -14,7 +14,7 @@ class OTPSenderPort(ABC):
     """Single-channel OTP delivery adapter (email, WhatsApp, SMS, …)."""
 
     @abstractmethod
-    def send(self, email: str, telephone: str, otp: str, ttl_seconds: int) -> None:
+    def send(self, uuid: str, email: str, telephone: str, otp: str, ttl_seconds: int) -> None:
         """
         Send OTP via this channel.
         Raise PermanentDeliveryError for unrecoverable failures (wrong credentials, etc.).

@@ -81,7 +81,7 @@ def _on_message(
     for sender in senders:
         name = type(sender).__name__
         try:
-            sender.send(email, telephone, otp, ttl_seconds)
+            sender.send(uuid, email, telephone, otp, ttl_seconds)
         except PermanentDeliveryError as exc:
             _log.error("Channel %s permanent failure uuid=%s: %s", name, uuid, exc)
             permanent_failures.append(name)
