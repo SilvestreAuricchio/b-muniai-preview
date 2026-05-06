@@ -2,5 +2,3 @@
 # Only these Google-authenticated e-mails gain SA-root access
 psas:
   - sauricchiopv@gmail.com
-  - silvestre@muninai.com.br
-  - thiago@muninai.com.br

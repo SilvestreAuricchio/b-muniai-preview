@@ -16,6 +16,7 @@ from src.application.use_cases.verify_otp import VerifyOTPUseCase
 from src.application.use_cases.approve_user import ApproveUserUseCase
 from src.application.use_cases.cancel_invitation import CancelInvitationUseCase
 from src.application.use_cases.list_users import ListUsersUseCase
+from src.application.use_cases.find_user_by_email import FindUserByEmailUseCase
 from src.infrastructure.http.middleware import register_middleware
 from src.infrastructure.http.blueprints.health import health_bp
 from src.infrastructure.http.blueprints.users import users_bp
@@ -62,11 +63,12 @@ def create_app() -> Flask:
 
     # --- Use cases ---
     app.config["USE_CASES"] = {
-        "list_users":        ListUsersUseCase(repo),
-        "create_user":       CreateUserUseCase(repo, log_port, challenge),
-        "verify_otp":        VerifyOTPUseCase(repo, log_port, challenge, notification),
-        "approve_user":      ApproveUserUseCase(repo, log_port, notification),
-        "cancel_invitation": CancelInvitationUseCase(repo, log_port, challenge),
+        "list_users":          ListUsersUseCase(repo),
+        "find_user_by_email":  FindUserByEmailUseCase(repo),
+        "create_user":         CreateUserUseCase(repo, log_port, challenge),
+        "verify_otp":          VerifyOTPUseCase(repo, log_port, challenge, notification),
+        "approve_user":        ApproveUserUseCase(repo, log_port, notification),
+        "cancel_invitation":   CancelInvitationUseCase(repo, log_port, challenge),
     }
     app.config["NOTIFICATION_PORT"] = notification
 

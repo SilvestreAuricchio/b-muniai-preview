@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, g, current_app
-from src.domain.entities.user import UserRole
+from src.domain.entities.user import UserRole, UserStatus
 from src.application.use_cases.create_user import CreateUserCommand
 from src.application.use_cases.verify_otp import VerifyOTPCommand
 from src.application.use_cases.approve_user import ApproveUserCommand
@@ -41,6 +41,32 @@ def list_users():
     """
     users = _uc("list_users").execute()
     return jsonify([_user_dict(u) for u in users])
+
+
+@users_bp.get("/users/by-email")
+def get_user_by_email():
+    """
+    Look up an active user by email address — used by the BFF during OAuth login.
+    Internal endpoint: reachable only from the BFF on the Docker network.
+    ---
+    tags: [users]
+    parameters:
+      - in: query
+        name: email
+        required: true
+        type: string
+    responses:
+      200: {description: Active user found}
+      400: {description: email param missing}
+      404: {description: No active user with this email}
+    """
+    email = (request.args.get("email") or "").strip()
+    if not email:
+        return jsonify(error="email is required"), 400
+    user = _uc("find_user_by_email").execute(email)
+    if user is None or user.status != UserStatus.ACTIVE:
+        return jsonify(error="not found"), 404
+    return jsonify(_user_dict(user)), 200
 
 
 @users_bp.post("/users")

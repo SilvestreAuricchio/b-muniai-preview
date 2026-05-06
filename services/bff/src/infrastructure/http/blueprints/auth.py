@@ -1,10 +1,15 @@
-import os, yaml, jwt
+import logging
+import os
+import urllib.parse
+import yaml
+import jwt
 from datetime import datetime, timezone, timedelta
 from flask import Blueprint, request, jsonify, redirect, current_app
 from authlib.integrations.flask_client import OAuth
 
 auth_bp = Blueprint("auth", __name__)
 oauth    = OAuth()
+_log     = logging.getLogger(__name__)
 
 
 def init_oauth(app):
@@ -22,13 +27,13 @@ def _jwt_key():
     return current_app.config["BFF_SECRET_KEY"]
 
 
-def _make_token(userinfo: dict) -> str:
+def _make_token(userinfo: dict, db_uuid: str | None = None, role: str = "SA-root") -> str:
     now = datetime.now(timezone.utc)
     payload = {
-        "sub":   userinfo["sub"],
+        "sub":   db_uuid or userinfo["sub"],
         "email": userinfo["email"],
         "name":  userinfo.get("name", userinfo["email"]),
-        "role":  "SA-root",
+        "role":  role,
         "iat":   now,
         "exp":   now + timedelta(hours=8),
     }
@@ -59,7 +64,12 @@ def google_login():
 @auth_bp.get("/auth/google/callback")
 def google_callback():
     """
-    Google OAuth callback — issues session cookie and redirects to app
+    Google OAuth callback — issues session cookie and redirects to app.
+
+    Auth resolution order:
+      1. Bootstrap YAML (authorized_psas.yaml) — initial SA-root only
+      2. Active user in the database — email + status=active
+      3. Unauthorized
     ---
     tags: [auth]
     responses:
@@ -71,12 +81,26 @@ def google_callback():
         userinfo = token.get("userinfo") or oauth.google.userinfo()
         email    = userinfo.get("email", "")
 
-        authorized = current_app.config["AUTHORIZED_EMAILS"]
-        if email not in authorized:
-            return redirect(f"{app_url}/?auth_error=unauthorized")
+        # 1. Bootstrap SA — static YAML allowlist
+        bootstrap_emails = current_app.config["AUTHORIZED_EMAILS"]
+        if email in bootstrap_emails:
+            jwt_token = _make_token(userinfo, role="SA-root")
+        else:
+            # 2. Active database user
+            backend = current_app.config["BACKEND_CLIENT"]
+            db_user, status = backend.get(
+                f"/users/by-email?email={urllib.parse.quote(email)}", {}
+            )
+            if status != 200:
+                _log.warning("Login attempt for unknown/inactive email: %s", email)
+                return redirect(f"{app_url}/?auth_error=unauthorized")
+            jwt_token = _make_token(
+                userinfo,
+                db_uuid=db_user["uuid"],
+                role=db_user["role"],
+            )
 
-        jwt_token = _make_token(userinfo)
-        response  = redirect(app_url)
+        response = redirect(app_url)
         response.set_cookie(
             "muniai_token", jwt_token,
             httponly=True, secure=True, samesite="Lax",
@@ -84,6 +108,7 @@ def google_callback():
         )
         return response
     except Exception as exc:
+        _log.exception("OAuth callback error: %s", exc)
         return redirect(f"{app_url}/?auth_error=oauth_failed")
 
 
