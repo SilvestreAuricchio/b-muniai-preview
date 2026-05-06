@@ -13,6 +13,8 @@ def _uc(name: str):
 
 
 def _user_dict(u) -> dict:
+    def _iso(dt):
+        return dt.isoformat() if dt else None
     return {
         "uuid":            u.uuid,
         "name":            u.name,
@@ -20,7 +22,10 @@ def _user_dict(u) -> dict:
         "telephone":       u.telephone,
         "role":            u.role.value,
         "status":          u.status.value,
-        "otpDispatchedAt": u.otp_dispatched_at.isoformat() if u.otp_dispatched_at else None,
+        "createdAt":       _iso(u.created_at),
+        "otpDispatchedAt": _iso(u.otp_dispatched_at),
+        "otpVerifiedAt":   _iso(u.otp_verified_at),
+        "activatedAt":     _iso(u.activated_at),
     }
 
 

@@ -40,4 +40,9 @@ class ApproveUserUseCase:
             user_name=updated.name,
             correlation_id=cmd.correlation_id,
         )
+        self._notification.send_activation_email(
+            user_email=updated.email,
+            user_name=updated.name,
+            correlation_id=cmd.correlation_id,
+        )
         return updated

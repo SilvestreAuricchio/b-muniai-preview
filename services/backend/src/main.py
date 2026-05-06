@@ -9,6 +9,7 @@ from src.infrastructure.messaging.noop_log_adapter import NoOpLogAdapter
 from src.infrastructure.messaging.rabbitmq_log_adapter import RabbitMQLogAdapter
 from src.infrastructure.cache.noop_otp_adapter import NoOpOTPAdapter
 from src.infrastructure.cache.noop_notification_adapter import NoOpNotificationAdapter
+from src.infrastructure.messaging.smtp_notification_adapter import SmtpNotificationAdapter
 from src.infrastructure.cache.rabbitmq_otp_publisher import RabbitMQOTPPublisher
 from src.application.use_cases.create_user import CreateUserUseCase
 from src.application.use_cases.verify_otp import VerifyOTPUseCase
@@ -37,6 +38,19 @@ def _build_challenge_adapter():
     return NoOpOTPAdapter()
 
 
+def _build_notification_adapter():
+    host = os.getenv("SMTP_HOST", "")
+    if not host:
+        return NoOpNotificationAdapter()
+    return SmtpNotificationAdapter(
+        host=host,
+        port=int(os.getenv("SMTP_PORT", "587")),
+        user=os.getenv("SMTP_USER", ""),
+        password=os.getenv("SMTP_PASSWORD", ""),
+        from_addr=os.getenv("SMTP_FROM", os.getenv("SMTP_USER", "")),
+    )
+
+
 def create_app() -> Flask:
     app = Flask(__name__)
 
@@ -44,7 +58,7 @@ def create_app() -> Flask:
     repo         = InMemoryUserRepository()
     log_port     = _build_log_adapter()
     challenge    = _build_challenge_adapter()
-    notification = NoOpNotificationAdapter()
+    notification = _build_notification_adapter()
 
     # --- Use cases ---
     app.config["USE_CASES"] = {

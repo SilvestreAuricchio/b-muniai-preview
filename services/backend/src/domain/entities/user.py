@@ -19,13 +19,16 @@ class UserStatus(str, Enum):
 
 @dataclass
 class User:
-    uuid: str
-    name: str
-    telephone: str
-    email: str
-    role: UserRole
-    status: UserStatus
+    uuid:              str
+    name:              str
+    telephone:         str
+    email:             str
+    role:              UserRole
+    status:            UserStatus
+    created_at:        datetime        = field(default_factory=lambda: datetime.now(timezone.utc))
     otp_dispatched_at: datetime | None = field(default=None)
+    otp_verified_at:   datetime | None = field(default=None)
+    activated_at:      datetime | None = field(default=None)
 
     @classmethod
     def create(cls, name: str, telephone: str, email: str, role: UserRole) -> "User":
@@ -36,7 +39,6 @@ class User:
             email=email,
             role=role,
             status=UserStatus.PENDING,
-            otp_dispatched_at=None,
         )
 
     def mark_otp_dispatched(self) -> None:
@@ -49,17 +51,22 @@ class User:
         self.telephone         = telephone
         self.role              = role
         self.status            = UserStatus.PENDING
+        self.created_at        = datetime.now(timezone.utc)
         self.otp_dispatched_at = None
+        self.otp_verified_at   = None
+        self.activated_at      = None
 
     def verify_otp(self) -> None:
         if self.status != UserStatus.PENDING:
             raise ValueError(f"OTP can only be verified for a pending user, current status: '{self.status.value}'")
-        self.status = UserStatus.PENDING_APPROVAL
+        self.status          = UserStatus.PENDING_APPROVAL
+        self.otp_verified_at = datetime.now(timezone.utc)
 
     def activate(self) -> None:
         if self.status != UserStatus.PENDING_APPROVAL:
             raise ValueError(f"Cannot activate user with status '{self.status.value}' — OTP must be verified first")
-        self.status = UserStatus.ACTIVE
+        self.status       = UserStatus.ACTIVE
+        self.activated_at = datetime.now(timezone.utc)
 
     def deactivate(self) -> None:
         if self.status not in (UserStatus.PENDING, UserStatus.PENDING_APPROVAL):

@@ -21,4 +21,12 @@ class NotificationPort(ABC):
     ) -> None: ...
 
     @abstractmethod
+    def send_activation_email(
+        self,
+        user_email: str,
+        user_name: str,
+        correlation_id: str,
+    ) -> None: ...
+
+    @abstractmethod
     def pop_for_psa(self, psa_uuid: str) -> list[dict]: ...

@@ -31,5 +31,8 @@ class NoOpNotificationAdapter(NotificationPort):
         })
         _log.info("NOTIFICATION psa=%s ← '%s' verified OTP — awaiting approval", psa_uuid, user_name)
 
+    def send_activation_email(self, user_email, user_name, correlation_id) -> None:
+        _log.info("ACTIVATION EMAIL → %s ('%s')  [dev: not sent]", user_email, user_name)
+
     def pop_for_psa(self, psa_uuid: str) -> list[dict]:
         return self._inbox.pop(psa_uuid, [])
