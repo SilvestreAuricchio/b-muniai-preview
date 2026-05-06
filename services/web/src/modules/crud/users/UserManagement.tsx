@@ -7,12 +7,13 @@ export type UserStatus = 'pending' | 'pending_approval' | 'active' | 'inactive'
 export type UserRole   = 'SA-root' | 'Scheduler' | 'Mediciner'
 
 export interface UserRow {
-  uuid:      string
-  name:      string
-  email:     string
-  telephone: string
-  role:      UserRole
-  status:    UserStatus
+  uuid:             string
+  name:             string
+  email:            string
+  telephone:        string
+  role:             UserRole
+  status:           UserStatus
+  otpDispatchedAt:  string | null
 }
 
 const STATUS_BADGE: Record<UserStatus, string> = {
@@ -97,6 +98,7 @@ export function UserManagement() {
                   <th className="px-4 py-3">Email</th>
                   <th className="px-4 py-3">Role</th>
                   <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">OTP Sent</th>
                   <th className="px-4 py-3">Actions</th>
                 </tr>
               </thead>
@@ -110,6 +112,14 @@ export function UserManagement() {
                       <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE[u.status]}`}>
                         {STATUS_LABEL[u.status]}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {u.otpDispatchedAt
+                        ? <span title={u.otpDispatchedAt} className="text-xs text-gray-500">
+                            {new Date(u.otpDispatchedAt).toLocaleString()}
+                          </span>
+                        : <span className="text-xs text-gray-300">—</span>
+                      }
                     </td>
                     <td className="px-4 py-3 space-x-2">
                       {u.status === 'pending_approval' && (

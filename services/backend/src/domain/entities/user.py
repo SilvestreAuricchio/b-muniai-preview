@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from enum import Enum
 import uuid as _uuid
 
@@ -24,6 +25,7 @@ class User:
     email: str
     role: UserRole
     status: UserStatus
+    otp_dispatched_at: datetime | None = field(default=None)
 
     @classmethod
     def create(cls, name: str, telephone: str, email: str, role: UserRole) -> "User":
@@ -34,7 +36,11 @@ class User:
             email=email,
             role=role,
             status=UserStatus.PENDING,
+            otp_dispatched_at=None,
         )
+
+    def mark_otp_dispatched(self) -> None:
+        self.otp_dispatched_at = datetime.now(timezone.utc)
 
     def verify_otp(self) -> None:
         if self.status != UserStatus.PENDING:

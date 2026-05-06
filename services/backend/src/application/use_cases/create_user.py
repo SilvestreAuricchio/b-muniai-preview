@@ -47,6 +47,8 @@ class CreateUserUseCase:
             psa_uuid=cmd.performed_by,
             ttl_seconds=OTP_TTL_SECONDS,
         )
+        saved.mark_otp_dispatched()
+        self._repo.update(saved)
 
         self._log.publish(
             action="CREATE_USER",

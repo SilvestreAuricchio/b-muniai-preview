@@ -14,12 +14,13 @@ def _uc(name: str):
 
 def _user_dict(u) -> dict:
     return {
-        "uuid":      u.uuid,
-        "name":      u.name,
-        "email":     u.email,
-        "telephone": u.telephone,
-        "role":      u.role.value,
-        "status":    u.status.value,
+        "uuid":            u.uuid,
+        "name":            u.name,
+        "email":           u.email,
+        "telephone":       u.telephone,
+        "role":            u.role.value,
+        "status":          u.status.value,
+        "otpDispatchedAt": u.otp_dispatched_at.isoformat() if u.otp_dispatched_at else None,
     }
 
 

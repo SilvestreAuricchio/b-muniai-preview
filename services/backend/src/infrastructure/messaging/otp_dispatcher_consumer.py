@@ -90,8 +90,8 @@ def run(amqp_url: str) -> None:
             )
             _log.info("OTP dispatcher ready — consuming queue=%s", QUEUE)
             ch.start_consuming()
-        except pika.exceptions.AMQPConnectionError as exc:
-            _log.error("RabbitMQ connection lost: %s — retrying in 5s", exc)
+        except (pika.exceptions.AMQPConnectionError, OSError) as exc:
+            _log.error("RabbitMQ connection error: %s — retrying in 5s", exc)
             time.sleep(5)
         except KeyboardInterrupt:
             _log.info("OTP dispatcher stopped")
