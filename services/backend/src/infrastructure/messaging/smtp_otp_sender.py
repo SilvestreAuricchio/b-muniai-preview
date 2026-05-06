@@ -3,7 +3,7 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from src.application.ports.otp_sender_port import OTPSenderPort
+from src.application.ports.otp_sender_port import OTPSenderPort, PermanentDeliveryError
 
 _log = logging.getLogger(__name__)
 
@@ -75,10 +75,17 @@ class SmtpOTPSender(OTPSenderPort):
         msg.attach(MIMEText(plain, "plain"))
         msg.attach(MIMEText(html,  "html"))
 
-        with smtplib.SMTP(self._host, self._port, timeout=15) as server:
-            server.ehlo()
-            server.starttls()
-            server.login(self._user, self._password)
-            server.sendmail(self._from_addr, [email], msg.as_string())
+        try:
+            with smtplib.SMTP(self._host, self._port, timeout=15) as server:
+                server.ehlo()
+                server.starttls()
+                server.login(self._user, self._password)
+                server.sendmail(self._from_addr, [email], msg.as_string())
+        except smtplib.SMTPAuthenticationError as exc:
+            raise PermanentDeliveryError(
+                f"SMTP auth failed for {self._user} — check SMTP_PASSWORD in .env: {exc}"
+            ) from exc
+        except smtplib.SMTPRecipientsRefused as exc:
+            raise PermanentDeliveryError(f"Recipient refused {email}: {exc}") from exc
 
         _log.info("OTP email sent → %s", email)

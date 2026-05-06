@@ -20,7 +20,7 @@ import time
 
 import pika
 
-from src.application.ports.otp_sender_port import OTPSenderPort
+from src.application.ports.otp_sender_port import OTPSenderPort, PermanentDeliveryError
 from src.infrastructure.messaging.noop_otp_sender import (
     NoOpEmailSender,
     NoOpWhatsAppSender,
@@ -76,18 +76,26 @@ def _on_message(
 
     _log.info("Dispatching OTP uuid=%s via %d channel(s)", uuid, len(senders))
 
-    failures: list[str] = []
+    transient_failures: list[str] = []
+    permanent_failures: list[str] = []
+
     for sender in senders:
+        name = type(sender).__name__
         try:
             sender.send(email, telephone, otp, ttl_seconds)
+        except PermanentDeliveryError as exc:
+            _log.error("Channel %s permanent failure uuid=%s: %s", name, uuid, exc)
+            permanent_failures.append(name)
         except Exception as exc:
-            name = type(sender).__name__
-            _log.error("Channel %s failed for uuid=%s: %s", name, uuid, exc)
-            failures.append(name)
+            _log.error("Channel %s transient failure uuid=%s: %s", name, uuid, exc)
+            transient_failures.append(name)
 
-    if failures:
-        _log.warning("uuid=%s — %d channel(s) failed %s → NACK requeue", uuid, len(failures), failures)
+    if transient_failures:
+        _log.warning("uuid=%s — transient failures %s → NACK requeue", uuid, transient_failures)
         channel.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+    elif permanent_failures:
+        _log.error("uuid=%s — permanent failures %s → NACK discard (fix config)", uuid, permanent_failures)
+        channel.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
     else:
         _log.info("uuid=%s — all channels delivered → ACK", uuid)
         channel.basic_ack(delivery_tag=method.delivery_tag)
