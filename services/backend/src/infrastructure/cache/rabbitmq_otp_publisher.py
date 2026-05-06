@@ -25,10 +25,10 @@ import redis
 import pika
 
 from src.application.ports.challenge_port import ChallengePort
+from src.infrastructure.messaging.otp_queue_setup import declare_otp_queues, MAIN_QUEUE
 
 _log = logging.getLogger(__name__)
 
-_QUEUE   = "otp.challenge"
 _KEY_TPL = "otp:{uuid}"
 
 
@@ -56,17 +56,17 @@ class RabbitMQOTPPublisher(ChallengePort):
         conn = pika.BlockingConnection(pika.URLParameters(self._amqp_url))
         try:
             ch = conn.channel()
-            ch.queue_declare(queue=_QUEUE, durable=True)
+            declare_otp_queues(ch)
             ch.basic_publish(
                 exchange="",
-                routing_key=_QUEUE,
+                routing_key=MAIN_QUEUE,
                 body=payload,
                 properties=pika.BasicProperties(delivery_mode=2),  # persistent
             )
         finally:
             conn.close()
 
-        _log.info("OTP_CHALLENGE published uuid=%s → queue=%s", uuid, _QUEUE)
+        _log.info("OTP_CHALLENGE published uuid=%s → queue=%s", uuid, MAIN_QUEUE)
 
     def verify(self, uuid: str, otp: str) -> str | None:
         entry = self._redis.hgetall(_KEY_TPL.format(uuid=uuid))

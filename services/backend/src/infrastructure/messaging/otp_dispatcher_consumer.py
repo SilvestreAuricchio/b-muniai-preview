@@ -27,10 +27,9 @@ from src.infrastructure.messaging.noop_otp_sender import (
     NoOpSMSSender,
 )
 from src.infrastructure.messaging.smtp_otp_sender import SmtpOTPSender
+from src.infrastructure.messaging.otp_queue_setup import declare_otp_queues, MAIN_QUEUE, FAILED_QUEUE
 
 _log = logging.getLogger(__name__)
-
-QUEUE = "otp.challenge"
 
 
 def _build_email_sender() -> OTPSenderPort:
@@ -94,7 +93,10 @@ def _on_message(
         _log.warning("uuid=%s — transient failures %s → NACK requeue", uuid, transient_failures)
         channel.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
     elif permanent_failures:
-        _log.error("uuid=%s — permanent failures %s → NACK discard (fix config)", uuid, permanent_failures)
+        _log.error(
+            "uuid=%s — permanent failures %s → NACK → routed to DLQ '%s' (inspect via /rabbitmq)",
+            uuid, permanent_failures, FAILED_QUEUE,
+        )
         channel.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
     else:
         _log.info("uuid=%s — all channels delivered → ACK", uuid)
@@ -108,13 +110,13 @@ def run(amqp_url: str) -> None:
         try:
             connection = pika.BlockingConnection(pika.URLParameters(amqp_url))
             ch = connection.channel()
-            ch.queue_declare(queue=QUEUE, durable=True)
+            declare_otp_queues(ch)
             ch.basic_qos(prefetch_count=1)
             ch.basic_consume(
-                queue=QUEUE,
+                queue=MAIN_QUEUE,
                 on_message_callback=lambda c, m, p, b: _on_message(c, m, p, b, senders),
             )
-            _log.info("OTP dispatcher ready — consuming queue=%s", QUEUE)
+            _log.info("OTP dispatcher ready — queue=%s  DLQ=%s", MAIN_QUEUE, FAILED_QUEUE)
             ch.start_consuming()
         except (pika.exceptions.AMQPConnectionError, OSError) as exc:
             _log.error("RabbitMQ connection error: %s — retrying in 5s", exc)
