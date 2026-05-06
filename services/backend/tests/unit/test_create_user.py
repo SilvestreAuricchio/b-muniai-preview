@@ -48,6 +48,26 @@ def test_rejects_duplicate_email(use_case):
         use_case.execute(cmd)
 
 
+def test_allows_reinvite_after_cancellation(use_case):
+    cmd = CreateUserCommand(
+        name="A", telephone="+55", email="reinvite@test.com",
+        role=UserRole.SA_ROOT, performed_by="sa", correlation_id="cid",
+    )
+    first = use_case.execute(cmd)
+    first.user.deactivate()   # simulate cancellation
+
+    second_cmd = CreateUserCommand(
+        name="A Updated", telephone="+55", email="reinvite@test.com",
+        role=UserRole.SA_ROOT, performed_by="sa", correlation_id="cid2",
+    )
+    result = use_case.execute(second_cmd)
+
+    assert result.user.uuid == first.user.uuid       # same record recycled
+    assert result.user.status == UserStatus.PENDING
+    assert result.user.name == "A Updated"
+    assert result.user.otp_dispatched_at is not None
+
+
 def test_publishes_log_event():
     log = MagicMock()
     uc = CreateUserUseCase(InMemoryUserRepository(), log, NoOpOTPAdapter())

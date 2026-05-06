@@ -1,6 +1,6 @@
 import secrets
 from dataclasses import dataclass
-from src.domain.entities.user import User, UserRole
+from src.domain.entities.user import User, UserRole, UserStatus
 from src.application.ports.user_repository import UserRepository
 from src.application.ports.log_port import LogPort
 from src.application.ports.challenge_port import ChallengePort
@@ -32,11 +32,16 @@ class CreateUserUseCase:
         self._challenge = challenge
 
     def execute(self, cmd: CreateUserCommand) -> CreateUserResult:
-        if self._repo.find_by_email(cmd.email):
-            raise ValueError(f"Email already registered: {cmd.email!r}")
-
-        user  = User.create(cmd.name, cmd.telephone, cmd.email, cmd.role)
-        saved = self._repo.save(user)
+        existing = self._repo.find_by_email(cmd.email)
+        if existing:
+            if existing.status != UserStatus.INACTIVE:
+                raise ValueError(f"Email already registered: {cmd.email!r}")
+            # Re-invitation of a previously cancelled user: reset and reuse record
+            existing.reinvite(cmd.name, cmd.telephone, cmd.role)
+            saved = self._repo.update(existing)
+        else:
+            user  = User.create(cmd.name, cmd.telephone, cmd.email, cmd.role)
+            saved = self._repo.save(user)
 
         otp = f"{secrets.randbelow(1_000_000):06d}"
         self._challenge.issue(

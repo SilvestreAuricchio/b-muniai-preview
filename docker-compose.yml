@@ -78,8 +78,13 @@ services:
   otp-dispatcher:
     build: ./services/backend
     command: python -m src.infrastructure.messaging.otp_dispatcher_consumer
+    env_file:
+      - path: .env
+        required: false
     environment:
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      # SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM
+      # are read from .env — leave blank here to avoid overriding
     depends_on:
       rabbitmq:
         condition: service_healthy

@@ -26,15 +26,33 @@ from src.infrastructure.messaging.noop_otp_sender import (
     NoOpWhatsAppSender,
     NoOpSMSSender,
 )
+from src.infrastructure.messaging.smtp_otp_sender import SmtpOTPSender
 
 _log = logging.getLogger(__name__)
 
 QUEUE = "otp.challenge"
 
 
+def _build_email_sender() -> OTPSenderPort:
+    host = os.environ.get("SMTP_HOST", "")
+    if not host:
+        _log.warning("SMTP_HOST not set — email OTP will not be delivered (NoOp)")
+        return NoOpEmailSender()
+    return SmtpOTPSender(
+        host=host,
+        port=int(os.environ.get("SMTP_PORT", "587")),
+        user=os.environ.get("SMTP_USER", ""),
+        password=os.environ.get("SMTP_PASSWORD", ""),
+        from_addr=os.environ.get("SMTP_FROM", os.environ.get("SMTP_USER", "")),
+    )
+
+
 def _build_senders() -> list[OTPSenderPort]:
-    # Swap NoOp senders for real adapters (SendGrid, Twilio, …) here.
-    return [NoOpEmailSender(), NoOpWhatsAppSender(), NoOpSMSSender()]
+    return [
+        _build_email_sender(),
+        NoOpWhatsAppSender(),   # replace with Twilio/360dialog adapter
+        NoOpSMSSender(),        # replace with Twilio adapter
+    ]
 
 
 def _on_message(

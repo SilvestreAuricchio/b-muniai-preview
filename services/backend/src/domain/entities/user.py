@@ -42,6 +42,15 @@ class User:
     def mark_otp_dispatched(self) -> None:
         self.otp_dispatched_at = datetime.now(timezone.utc)
 
+    def reinvite(self, name: str, telephone: str, role: "UserRole") -> None:
+        if self.status != UserStatus.INACTIVE:
+            raise ValueError(f"Can only re-invite an inactive user, current status: '{self.status.value}'")
+        self.name              = name
+        self.telephone         = telephone
+        self.role              = role
+        self.status            = UserStatus.PENDING
+        self.otp_dispatched_at = None
+
     def verify_otp(self) -> None:
         if self.status != UserStatus.PENDING:
             raise ValueError(f"OTP can only be verified for a pending user, current status: '{self.status.value}'")
