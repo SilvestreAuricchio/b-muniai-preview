@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, FormEvent } from 'react'
+import { useState, useEffect, FormEvent } from 'react'
 import { api } from '@/shared/api'
 import { maskCPF, cpfError } from '@/shared/taxId'
 import type { HospitalRow } from '@/modules/crud/hospitals/HospitalManagement'
