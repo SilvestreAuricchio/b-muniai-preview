@@ -107,23 +107,47 @@ PSA approves → status: active → confirmation email → NSA can log in via Go
 Reinvite: invite same email → old cycle snapshotted to `invite_history` → user reset to pending.
 **OTP retry:** transient → NACK requeue=True; permanent → NACK requeue=False → DLQ.
 
-### UC-03 Manage User Status (complete)
+### UC-03 Scheduler Manages Slots (complete)
+- Scheduler sees only `USER_HOSPITAL`-scoped hospitals; SA-root sees all
+- `slot` table: `uuid PK · hospital_uuid FK · department ENUM(UTI/PA/PS) · type ENUM(PM/PE/CC/CM) · date DATE · mediciner_crm nullable · created_by FK · created_at`
+- Endpoints: `POST/GET /slots`, `PUT/DELETE /slots/<uuid>` (backend + BFF)
+- Frontend `/slots`: Table view (20/page, date-window nav) + Agenda view (day-card grid, period selector: Current Week default · +2d · +4d · +8d · 1W · 2W · 1M · Custom)
+- Frontend warns before deleting occupied slots (`mediciner_crm` set)
+- See `docs/architecture/sequence-create-slot.md`
+
+### UC-04 Manage User Status (complete)
 - `active → disabled` (Disable), `disabled → active` (Re-enable), `active|disabled → inactive` (Deactivate)
 - Immediate session revocation via Redis email blocklist + itk on disable/deactivate
 - UI: `⋯` action menu per row with confirmation dialogs
 
+### Hospital Audit Log (complete)
+- Every hospital CREATE/UPDATE publishes to RabbitMQ queue `hospital.audit`
+- `hospital-audit-worker` consumer persists to MongoDB `hospital_audit_log` collection
+- Document: `{action, hospitalId, userId, timestamp, before, after}` — `before=null` for CREATE
+- Indexes: `hospitalId` asc · `userId` asc · `timestamp` desc
+- Port: `AuditPublisherPort` → `HospitalAuditPublisher` (fire-and-forget) / `NoOpAuditPublisher`
+
+### Mediciner CRUD (complete — invitation flow pending full UI wiring)
+- `mediciner_profile` table: `user_uuid PK FK · cpf UNIQUE · email UNIQUE · specialty · crm_state CHAR(2) · crm_number VARCHAR`
+- Invitation reuses UC-01 with `role=Mediciner`; profile row created atomically
+- CPF validation: official two-check-digit algorithm in `domain/validation/tax_id.py` and `taxId.ts`
+- CRM lookup: CFM API requires licence (no-op adapter in place; `CrmLookupPort` ready)
+- Endpoints: `POST/GET /medicineres`, `GET/PUT /medicineres/<uuid>`, `GET /medicineres/crm-lookup`
+- Frontend `/medicineres`: paginated table + `InviteMedicinereModal` (CPF masked, 27-UF CRM select)
+
 ### Backend use cases (`application/use_cases/`)
-`create_user`, `verify_otp`, `approve_user`, `cancel_invitation`, `find_user_by_email`, `list_users`, `disable_user`, `enable_user`, `deactivate_user`, `list_invite_history`, `create_hospital`, `list_hospitals`, `get_hospital`, `update_hospital`
+`create_user`, `verify_otp`, `approve_user`, `cancel_invitation`, `find_user_by_email`, `list_users`, `disable_user`, `enable_user`, `deactivate_user`, `list_invite_history`, `create_hospital`, `list_hospitals`, `get_hospital`, `update_hospital`, `create_slot`, `list_slots`, `update_slot`, `delete_slot`, `create_mediciner`, `list_medicineres`, `get_mediciner`, `update_mediciner`, `lookup_crm`
 
 ### Frontend routes
 | Route | Component |
 |---|---|
-| `/` | Dashboard — user stats card + hospital stats card, quick actions |
+| `/` | Dashboard — SA: user + hospital stats; Scheduler: scoped hospital card + quick actions |
 | `/users` | UserManagement — invite, approve, disable, re-enable, deactivate, reinvite, invite history |
-| `/hospitals` | HospitalManagement — flat table, "View →" action per row |
-| `/hospitals/:uuid` | HospitalDetail — two-column profile card, full edit, stat cards |
+| `/hospitals` | HospitalManagement — flat table, "View →" opens HospitalDetailOverlay |
+| `/hospitals/:uuid` | HospitalDetail — unified view/edit card |
+| `/slots` | SlotManagement — Table + Agenda views (Scheduler + SA-root) |
+| `/medicineres` | MedicinereManagement — table + InviteMedicinereModal (SA-root) |
 | `/activate/:uuid` | ActivatePage (public, OTP entry) |
-| `/crud/hospitals` | Redirects to `/hospitals` |
 
 ### PostgreSQL Schema (active, auto-created on startup)
 ```
@@ -132,8 +156,12 @@ app_user(uuid PK, name, telephone, email UNIQUE, role, status, created_at,
 hospital(uuid PK, cnpj VARCHAR(14) UNIQUE, name, address, slot_types TEXT[])
 user_hospital(user_uuid FK→app_user.uuid, hospital_uuid FK→hospital.uuid, scope, PK composite)
 invite_history(id PK, user_uuid FK, invited_at, otp_dispatched_at, otp_verified_at, activated_at)
+slot(uuid PK, hospital_uuid FK, department VARCHAR(3), type VARCHAR(2), date DATE,
+     mediciner_crm VARCHAR nullable, created_by FK, created_at TIMESTAMP)
+mediciner_profile(user_uuid PK FK→app_user.uuid, cpf VARCHAR(11) UNIQUE, email UNIQUE,
+                  specialty VARCHAR, crm_state CHAR(2), crm_number VARCHAR)
 ```
-**Note:** `hospital.cnpj` is the alternate key (immutable after creation). Nuke required when migrating from old `cnpj PK` schema.
+**Note:** `hospital.cnpj` is the alternate key (immutable after creation). `slot` and `mediciner_profile` tables require a `nuke` if upgrading from a schema without them.
 
 ---
 
@@ -145,7 +173,9 @@ services/
     shell/             LoginPage.tsx, ActivatePage.tsx, Shell.tsx, Header.tsx, Sidebar.tsx
     dashboard/         Dashboard.tsx (stats card, fixed tooltip), InsightCard.tsx
     modules/crud/users/    UserManagement.tsx, CreateSAModal.tsx, VerifyOTPModal.tsx
-    modules/crud/hospitals/ HospitalManagement.tsx, HospitalDetail.tsx, CreateHospitalOverlay.tsx
+    modules/crud/hospitals/ HospitalManagement.tsx, HospitalDetail.tsx, HospitalDetailOverlay.tsx, CreateHospitalOverlay.tsx
+    modules/crud/slots/     SlotManagement.tsx, CreateSlotModal.tsx, EditSlotModal.tsx
+    modules/crud/medicineres/ MedicinereManagement.tsx, InviteMedicinereModal.tsx
     shared/            api.ts (global 401 handler + credentials:include + put()),
                        context/AuthContext.tsx (auth + 44min refresh interval),
                        components/RedCross.tsx
@@ -174,12 +204,22 @@ services/
     infrastructure/cache/rabbitmq_otp_publisher.py
     infrastructure/messaging/otp_dispatcher_consumer.py
     infrastructure/http/blueprints/users.py    ← all user endpoints incl. /users/by-email?anyStatus
-    infrastructure/http/blueprints/hospitals.py ← GET/POST /hospitals, GET/PUT /hospitals/<uuid>
-    application/use_cases/get_hospital.py      ← find by uuid
-    application/use_cases/update_hospital.py   ← mutate name/address/slot_types + log
+    infrastructure/http/blueprints/hospitals.py ← GET/POST /hospitals, GET/PUT /hospitals/<uuid>; scoped by role
+    infrastructure/http/blueprints/slots.py    ← POST/GET/PUT/DELETE /slots
+    infrastructure/http/blueprints/medicineres.py ← POST/GET/PUT /medicineres + crm-lookup
+    infrastructure/messaging/hospital_audit_publisher.py ← RabbitMQ publisher (fire-and-forget)
+    infrastructure/messaging/hospital_audit_consumer.py  ← standalone worker → MongoDB
+    infrastructure/external/crm_lookup_adapter.py        ← no-op (CFM licence required)
+    infrastructure/persistence/postgres_slot_repository.py
+    infrastructure/persistence/postgres_mediciner_repository.py
+    domain/entities/slot.py, mediciner.py
+    application/ports/slot_repository.py, mediciner_repository.py, audit_publisher_port.py, crm_lookup_port.py
+  bff/src/
+    infrastructure/http/blueprints/slots.py, medicineres.py ← forwarding blueprints
 infra/nginx/nginx.conf
 docs/architecture/  c4-diagrams.md, domain-model.md, sequence-create-sa.md,
-                    sequence-manage-user-status.md, sequence-invite-scheduler.md
+                    sequence-invite-scheduler.md, sequence-create-slot.md,
+                    sequence-manage-user-status.md (UC-04)
 ```
 
 ---
@@ -220,8 +260,8 @@ docs/architecture/  c4-diagrams.md, domain-model.md, sequence-create-sa.md,
 
 ## What Comes Next (likely)
 
-- Scheduler and Mediciner invitation/activation flows
-- Department and Slot CRUD endpoints (Hospital detail stubs: Mediciners, Open Slots)
-- PERMISSION and USER_HOSPITAL enforcement
-- MongoDB OPERATION_LOG adapter
-- Mediciner dashboard
+- PERMISSION and USER_HOSPITAL enforcement (RBAC table seeding + middleware checks)
+- MongoDB OPERATION_LOG adapter (replace in-memory log with persistent MongoDB collection)
+- Mediciner dashboard (slot browsing, shift acceptance)
+- Mediciner invitation activation flow (full UI — `ActivatePage` already supports OTP; need Mediciner-specific onboarding step to collect CPF/CRM at activation)
+- Hospital detail stubs: Mediciners tab + Open Slots tab

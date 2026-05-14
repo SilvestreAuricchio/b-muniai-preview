@@ -1,4 +1,4 @@
-# UC-03: Manage User Status — Sequence Diagram
+# UC-04: Manage User Status — Sequence Diagram
 
 > Covers three post-activation lifecycle operations available to SA-root: **Disable**, **Re-enable**, and **Deactivate**. The invitation flow (OTP → approval) is covered in `sequence-create-sa.md` and `sequence-invite-scheduler.md`.
 
@@ -39,7 +39,7 @@ PENDING ──(verifyOTP)──> PENDING_APPROVAL ──(approve)──> ACTIVE
 | 1 | What triggers a "Disable"? | SA-root clicks ⋯ → Disable on an Active user row. |
 | 2 | Can a disabled user log in? | No — BFF login check (`GET /users/by-email`) already filters `status == ACTIVE`; disabled users are rejected automatically. |
 | 3 | Is "Deactivate" reversible? | Only through a new invitation (`reinvite()` flow). The record is preserved with `status = inactive`. |
-| 4 | What is the difference between "Cancel invitation" (UC-01) and "Deactivate" (UC-03)? | Cancel acts on PENDING/PENDING_APPROVAL users (invitation not yet completed). Deactivate acts on ACTIVE/DISABLED users (fully onboarded). Both set `status = inactive`. |
+| 4 | What is the difference between "Cancel invitation" (UC-01) and "Deactivate" (UC-04)? | Cancel acts on PENDING/PENDING_APPROVAL users (invitation not yet completed). Deactivate acts on ACTIVE/DISABLED users (fully onboarded). Both set `status = inactive`. |
 | 5 | Are there new timestamp fields? | No — status change is sufficient in v1; audit trail is in OPERATION_LOG. |
 | 6 | What OPERATION_LOG action strings are used? | `DISABLE_USER`, `ENABLE_USER`, `DEACTIVATE_USER`. |
 
@@ -118,7 +118,7 @@ skinparam BoxPadding 12
 skinparam ParticipantPadding 20
 skinparam SequenceGroupBodyBackgroundColor transparent
 
-title UC-03: Manage User Status (Disable / Re-enable / Deactivate)
+title UC-04: Manage User Status (Disable / Re-enable / Deactivate)
 
 actor "SA-root\n[PSA]" as PSA
 participant "UI"       as UI
@@ -180,7 +180,7 @@ note over PSA : User can only return to ACTIVE\nvia a new invitation (reinvite f
 
 ---
 
-## API Endpoints Added (UC-03)
+## API Endpoints Added (UC-04)
 
 | Method | Path | Body | Success | Error |
 |---|---|---|---|---|
