@@ -102,7 +102,7 @@ export function ActivatePage() {
           )}
 
           {phase === 'success' && (
-            <div className="space-y-3 text-center">
+            <div className="space-y-4 text-center">
               <div className="flex justify-center">
                 <span className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600 text-2xl">✓</span>
               </div>
@@ -111,6 +111,12 @@ export function ActivatePage() {
                 Your identity has been confirmed. An administrator will review and activate your
                 account shortly. You will be notified by email.
               </p>
+              <a
+                href="/"
+                className="btn-brand inline-block w-full py-3 text-sm"
+              >
+                Go to home page
+              </a>
             </div>
           )}
 

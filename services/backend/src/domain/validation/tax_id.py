@@ -6,6 +6,26 @@ def _char_value(c: str) -> int:
     return ord(c.upper()) - 48
 
 
+def _validate_cpf(raw: str) -> None:
+    clean = re.sub(r'\D', '', raw)
+    if len(clean) != 11:
+        raise ValueError(f"CPF must have 11 digits (got {len(clean)})")
+    if len(set(clean)) == 1:
+        raise ValueError("CPF must not consist of a single repeated digit")
+
+    s1 = sum(int(clean[i]) * (10 - i) for i in range(9))
+    r1 = s1 % 11
+    d1 = 0 if r1 < 2 else 11 - r1
+    if int(clean[9]) != d1:
+        raise ValueError("Invalid CPF: first check digit mismatch")
+
+    s2 = sum(int(clean[i]) * (11 - i) for i in range(10))
+    r2 = s2 % 11
+    d2 = 0 if r2 < 2 else 11 - r2
+    if int(clean[10]) != d2:
+        raise ValueError("Invalid CPF: second check digit mismatch")
+
+
 def _validate_cnpj(raw: str) -> None:
     """
     Validate a Brazilian CNPJ (alphanumeric format, IN RFB 2.229/2024).
@@ -48,16 +68,16 @@ def _validate_cnpj(raw: str) -> None:
 # ---------------------------------------------------------------------------
 # Country dispatch
 
-_VALIDATORS: dict[str, callable] = {
-    "BR": _validate_cnpj,
-}
-
 
 def validate_tax_id(country: str, raw: str) -> None:
     """Validate a tax ID for the given ISO-3166-1 alpha-2 country code.
     Raises ValueError with a human-readable message on failure.
     Unknown countries are silently accepted (future extensibility).
+    For Brazil: 11-digit raw → CPF; 14-character raw → CNPJ.
     """
-    validator = _VALIDATORS.get(country.upper())
-    if validator:
-        validator(raw)
+    if country.upper() == "BR":
+        digits_only = re.sub(r'\D', '', raw)
+        if len(digits_only) == 11:
+            _validate_cpf(raw)
+        else:
+            _validate_cnpj(raw)

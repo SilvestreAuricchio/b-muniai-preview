@@ -11,6 +11,7 @@ class ChallengePort(ABC):
         otp: str,
         psa_uuid: str,
         ttl_seconds: int,
+        base_url: str = "",
     ) -> None: ...
 
     @abstractmethod

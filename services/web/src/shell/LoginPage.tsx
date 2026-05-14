@@ -38,6 +38,14 @@ export function LoginPage({ error }: Props) {
             Sign in with Google
           </a>
 
+          {error === 'session_revoked' && (
+            <div className="rounded-md bg-red-50 border border-red-200 px-4 py-3 text-center space-y-1">
+              <p className="text-sm font-medium text-red-700">Access revoked</p>
+              <p className="text-xs text-red-600">
+                Your account has been suspended or deactivated. Contact an administrator to restore access.
+              </p>
+            </div>
+          )}
           {error === 'unauthorized' && (
             <p className="text-center text-xs text-red-600">
               Your email is not authorized to access this platform.

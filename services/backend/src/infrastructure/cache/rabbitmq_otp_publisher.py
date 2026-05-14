@@ -39,7 +39,7 @@ class RabbitMQOTPPublisher(ChallengePort):
 
     # ── ChallengePort ──────────────────────────────────────────────────────
 
-    def issue(self, uuid: str, email: str, telephone: str, otp: str, psa_uuid: str, ttl_seconds: int) -> None:
+    def issue(self, uuid: str, email: str, telephone: str, otp: str, psa_uuid: str, ttl_seconds: int, base_url: str = "") -> None:
         # 1. Persist in Redis so verify() works before the consumer runs
         key = _KEY_TPL.format(uuid=uuid)
         self._redis.hset(key, mapping={"otp": otp, "psa_uuid": psa_uuid})
@@ -52,6 +52,7 @@ class RabbitMQOTPPublisher(ChallengePort):
             "telephone":   telephone,
             "otp":         otp,
             "ttl_seconds": ttl_seconds,
+            "base_url":    base_url,
         })
         conn = pika.BlockingConnection(pika.URLParameters(self._amqp_url))
         try:

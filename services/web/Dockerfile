@@ -10,5 +10,6 @@ WORKDIR /app
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 COPY package.json ./
+COPY vite.config.ts ./
 EXPOSE 30000
 CMD ["npx", "vite", "preview", "--host", "0.0.0.0", "--port", "30000"]

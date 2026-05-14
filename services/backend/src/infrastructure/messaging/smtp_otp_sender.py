@@ -42,9 +42,9 @@ class SmtpOTPSender(OTPSenderPort):
         self._from_addr = from_addr
         self._app_url   = os.environ.get("APP_URL", "https://localhost").rstrip("/")
 
-    def send(self, uuid: str, email: str, telephone: str, otp: str, ttl_seconds: int) -> None:
+    def send(self, uuid: str, email: str, telephone: str, otp: str, ttl_seconds: int, base_url: str = "") -> None:
         ttl          = _ttl_label(ttl_seconds)
-        activate_url = f"{self._app_url}/activate/{uuid}"
+        activate_url = f"{base_url or self._app_url}/activate/{uuid}"
 
         msg = MIMEMultipart("alternative")
         msg["Subject"] = "MuniAI — Your verification code"

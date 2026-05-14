@@ -25,14 +25,15 @@ def _hospital_dict(h, scheduler_count: int = 0) -> dict:
 @hospitals_bp.get("/hospitals")
 def list_hospitals():
     """
-    List all hospitals
+    List hospitals (all for SA-root, scoped for Scheduler)
     ---
     tags: [hospitals]
     responses:
       200:
         description: List of hospitals with scheduler counts
     """
-    result = _uc("list_hospitals").execute()
+    user_uuid = g.auth_sub if g.auth_role == "Scheduler" else None
+    result    = _uc("list_hospitals").execute(user_uuid=user_uuid)
     return jsonify([
         _hospital_dict(h, result.scheduler_counts.get(h.uuid, 0))
         for h in result.hospitals

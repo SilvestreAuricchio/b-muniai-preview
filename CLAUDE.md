@@ -45,10 +45,45 @@ Core entities: `User` → (`Scheduler` | `Mediciner`), `Hospital` → `Departmen
 
 ## Commands
 
-```bash
-# Start full stack
-docker compose up --build
+**Stack shortcuts:**
 
+Windows (PowerShell):
+```powershell
+.\stack.ps1 up                  # Build images and start all services in background
+.\stack.ps1 down                # Stop all containers (data is preserved)
+.\stack.ps1 restart             # down + up in one step
+.\stack.ps1 build               # Rebuild images without starting
+.\stack.ps1 logs                # Follow logs for all services
+.\stack.ps1 logs <service>      # Follow logs for a specific service
+.\stack.ps1 clean               # Remove named volumes (redis/rabbitmq/grafana/certs); ./data/ untouched
+.\stack.ps1 nuke                # WARNING: full wipe — named volumes + ./data/ directories (confirms before running)
+```
+
+Linux / macOS (Makefile):
+```bash
+make up        # Build images and start all services in background
+make down      # Stop all containers (data is preserved)
+make restart   # down + up in one step
+make build     # Rebuild images without starting
+make logs      # Follow logs for all services
+make logs-bff  # Follow logs for a specific service (logs-<name>)
+make clean     # Remove named volumes; bind-mount ./data/ is NOT removed
+make nuke      # WARNING: full wipe — named volumes + ./data/ directories
+```
+
+**Persistent data directories** (bind mounts — survive `docker compose down`, `make clean`, Docker Desktop resets):
+
+```
+data/postgres/     ← PostgreSQL data
+data/mongodb/      ← MongoDB data
+data/prometheus/   ← Prometheus TSDB
+```
+
+These directories are created automatically on first `make up` and are excluded from git.
+
+**Direct docker compose commands:**
+
+```bash
 # Scale backend horizontally
 docker compose up --scale backend=3
 
@@ -58,10 +93,6 @@ docker compose up -d backend
 
 # Run backend unit tests
 docker compose exec backend pytest tests/unit/
-
-# View logs
-docker compose logs otp-dispatcher -f
-docker compose logs backend -f
 
 # Manage RabbitMQ queues
 docker compose exec rabbitmq rabbitmqctl list_queues name durable arguments
@@ -152,6 +183,19 @@ PSA clicks Approve
 **OTP retry semantics:**
 - Transient failure (network) → NACK requeue=True → re-delivered
 - Permanent failure (bad SMTP credentials, invalid email) → NACK requeue=False → routed to `otp.challenge.failed` DLQ
+
+## Working Rules
+
+These rules govern how Claude Code must behave in this project.
+
+### 1. Keep docs in sync with implementation
+Whenever any implementation change is made — new use case, new endpoint, schema change, flow change, architectural decision — update the relevant file(s) under `docs/architecture/` and `Notes.md` in the same response. Never leave docs behind.
+
+### 2. Plan before extensive changes
+Any change that touches more than one service, introduces a new layer, modifies auth/authz flow, or refactors existing use cases is "extensive". For those, present a written plan and wait for explicit confirmation before writing any code.
+
+### 3. Session bootstrap
+The file `.claude/SESSION_BOOTSTRAP.md` contains a full context summary for this project. At the start of any new conversation, loading that file restores the full working context (domain model, architecture decisions, current implementation status, working rules).
 
 ## Architecture Documentation
 

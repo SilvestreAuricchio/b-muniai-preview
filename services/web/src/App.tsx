@@ -6,10 +6,14 @@ import { Dashboard } from '@/dashboard/Dashboard'
 import { LoginPage } from '@/shell/LoginPage'
 import { ActivatePage } from '@/shell/ActivatePage'
 
-const Reports        = lazy(() => import('@/modules/reports/Reports').then((m) => ({ default: m.Reports })))
-const Crud           = lazy(() => import('@/modules/crud/Crud').then((m) => ({ default: m.Crud })))
-const UserManagement = lazy(() => import('@/modules/crud/users/UserManagement').then((m) => ({ default: m.UserManagement })))
-const Logs           = lazy(() => import('@/modules/logs/Logs').then((m) => ({ default: m.Logs })))
+const Reports            = lazy(() => import('@/modules/reports/Reports').then((m) => ({ default: m.Reports })))
+const Crud               = lazy(() => import('@/modules/crud/Crud').then((m) => ({ default: m.Crud })))
+const UserManagement     = lazy(() => import('@/modules/crud/users/UserManagement').then((m) => ({ default: m.UserManagement })))
+const HospitalManagement = lazy(() => import('@/modules/crud/hospitals/HospitalManagement').then((m) => ({ default: m.HospitalManagement })))
+const HospitalDetail     = lazy(() => import('@/modules/crud/hospitals/HospitalDetail').then((m) => ({ default: m.HospitalDetail })))
+const SlotManagement         = lazy(() => import('@/modules/crud/slots/SlotManagement').then((m) => ({ default: m.SlotManagement })))
+const MedicinereManagement   = lazy(() => import('@/modules/crud/medicineres/MedicinereManagement').then((m) => ({ default: m.MedicinereManagement })))
+const Logs               = lazy(() => import('@/modules/logs/Logs').then((m) => ({ default: m.Logs })))
 
 function ModuleFallback() {
   return (
@@ -41,8 +45,22 @@ function AppContent() {
         <Route path="reports/*" element={
           <Suspense fallback={<ModuleFallback />}><Reports /></Suspense>
         } />
-        <Route path="crud/users" element={
+        <Route path="users" element={
           <Suspense fallback={<ModuleFallback />}><UserManagement /></Suspense>
+        } />
+        <Route path="crud/users" element={<Navigate to="/users" replace />} />
+        <Route path="hospitals" element={
+          <Suspense fallback={<ModuleFallback />}><HospitalManagement /></Suspense>
+        } />
+        <Route path="hospitals/:uuid" element={
+          <Suspense fallback={<ModuleFallback />}><HospitalDetail /></Suspense>
+        } />
+        <Route path="crud/hospitals" element={<Navigate to="/hospitals" replace />} />
+        <Route path="slots" element={
+          <Suspense fallback={<ModuleFallback />}><SlotManagement /></Suspense>
+        } />
+        <Route path="medicineres" element={
+          <Suspense fallback={<ModuleFallback />}><MedicinereManagement /></Suspense>
         } />
         <Route path="crud/:entity?" element={
           <Suspense fallback={<ModuleFallback />}><Crud /></Suspense>

@@ -11,6 +11,8 @@ auth_bp = Blueprint("auth", __name__)
 oauth    = OAuth()
 _log     = logging.getLogger(__name__)
 
+_TOKEN_TTL_SECONDS = 88 * 60  # 88 minutes
+
 
 def init_oauth(app):
     oauth.init_app(app)
@@ -27,7 +29,12 @@ def _jwt_key():
     return current_app.config["BFF_SECRET_KEY"]
 
 
-def _make_token(userinfo: dict, db_uuid: str | None = None, role: str = "SA-root") -> str:
+def _make_token(
+    userinfo: dict,
+    db_uuid: str | None = None,
+    role: str = "SA-root",
+    itk: str | None = None,
+) -> str:
     now = datetime.now(timezone.utc)
     payload = {
         "sub":   db_uuid or userinfo["sub"],
@@ -35,8 +42,10 @@ def _make_token(userinfo: dict, db_uuid: str | None = None, role: str = "SA-root
         "name":  userinfo.get("name", userinfo["email"]),
         "role":  role,
         "iat":   now,
-        "exp":   now + timedelta(hours=8),
+        "exp":   now + timedelta(seconds=_TOKEN_TTL_SECONDS),
     }
+    if itk:
+        payload["itk"] = itk
     return jwt.encode(payload, _jwt_key(), algorithm="HS256")
 
 
@@ -55,9 +64,10 @@ def google_login():
       503: {description: Google OAuth not configured}
     """
     if not current_app.config.get("GOOGLE_CLIENT_ID"):
-        app_url = current_app.config["APP_URL"]
+        app_url = f"{request.scheme}://{request.host}"
         return redirect(f"{app_url}/?auth_error=not_configured")
-    redirect_uri = current_app.config["GOOGLE_REDIRECT_URI"]
+    redirect_uri = f"{request.scheme}://{request.host}/bff/auth/google/callback"
+    _log.info("OAuth login  scheme=%s  host=%s  redirect_uri=%s", request.scheme, request.host, redirect_uri)
     return oauth.google.authorize_redirect(redirect_uri)
 
 
@@ -75,7 +85,7 @@ def google_callback():
     responses:
       302: {description: Redirect to app}
     """
-    app_url = current_app.config["APP_URL"]
+    app_url = f"{request.scheme}://{request.host}"
     try:
         token    = oauth.google.authorize_access_token()
         userinfo = token.get("userinfo") or oauth.google.userinfo()
@@ -84,6 +94,14 @@ def google_callback():
         # 1. Bootstrap SA — static YAML allowlist
         bootstrap_emails = current_app.config["AUTHORIZED_EMAILS"]
         if email in bootstrap_emails:
+            # Respect DB-level disable/deactivate even for bootstrap SAs
+            backend  = current_app.config["BACKEND_CLIENT"]
+            db_check, db_status = backend.get(
+                f"/users/by-email?email={urllib.parse.quote(email)}&anyStatus=true", {}
+            )
+            if db_status == 200 and db_check.get("status") in ("disabled", "inactive"):
+                _log.warning("Bootstrap SA login blocked by DB status: %s  status=%s", email, db_check["status"])
+                return redirect(f"{app_url}/?auth_error=session_revoked")
             jwt_token = _make_token(userinfo, role="SA-root")
         else:
             # 2. Active database user
@@ -98,13 +116,14 @@ def google_callback():
                 userinfo,
                 db_uuid=db_user["uuid"],
                 role=db_user["role"],
+                itk=db_user.get("inviteToken"),
             )
 
         response = redirect(app_url)
         response.set_cookie(
             "muniai_token", jwt_token,
             httponly=True, secure=True, samesite="Lax",
-            max_age=8 * 3600,
+            max_age=_TOKEN_TTL_SECONDS,
         )
         return response
     except Exception as exc:
@@ -144,6 +163,42 @@ def get_me():
         return jsonify(error="token expired"), 401
     except jwt.InvalidTokenError:
         return jsonify(error="invalid token"), 401
+
+
+@auth_bp.get("/auth/refresh")
+def refresh_token():
+    """
+    Re-issue JWT with a fresh 88-minute expiry (sliding session).
+    Called automatically by the frontend every 44 minutes while the tab is open.
+    ---
+    tags: [auth]
+    responses:
+      200: {description: New cookie issued}
+      401: {description: Not authenticated or session revoked}
+    """
+    token = request.cookies.get("muniai_token")
+    if not token:
+        return jsonify(error="not authenticated"), 401
+    try:
+        payload = _decode_token(token)
+    except jwt.ExpiredSignatureError:
+        return jsonify(error="token_expired"), 401
+    except jwt.InvalidTokenError:
+        return jsonify(error="invalid_token"), 401
+
+    new_token = _make_token(
+        {"sub": payload["sub"], "email": payload["email"], "name": payload["name"]},
+        db_uuid=payload["sub"],
+        role=payload["role"],
+        itk=payload.get("itk"),
+    )
+    response = jsonify(ok=True)
+    response.set_cookie(
+        "muniai_token", new_token,
+        httponly=True, secure=True, samesite="Lax",
+        max_age=_TOKEN_TTL_SECONDS,
+    )
+    return response
 
 
 @auth_bp.post("/auth/logout")

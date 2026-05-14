@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Header } from '@/shell/Header'
 import { api } from '@/shared/api'
 import { useAuth } from '@/shared/context/AuthContext'
 import { maskTaxId } from '@/shared/taxId'
+import { CreateHospitalOverlay } from './CreateHospitalOverlay'
+import { HospitalDetailOverlay } from './HospitalDetailOverlay'
 
 export interface HospitalRow {
   uuid:           string
@@ -22,11 +23,12 @@ const STATUS_DOT: Record<string, string> = {
 }
 
 export function HospitalManagement() {
-  const { country }                     = useAuth()
-  const navigate                        = useNavigate()
-  const [hospitals, setHospitals]       = useState<HospitalRow[]>([])
-  const [loading,   setLoading]         = useState(true)
-  const [error,     setError]           = useState<string | null>(null)
+  const { country }                       = useAuth()
+  const [hospitals,    setHospitals]    = useState<HospitalRow[]>([])
+  const [loading,      setLoading]      = useState(true)
+  const [error,        setError]        = useState<string | null>(null)
+  const [showCreate,   setShowCreate]   = useState(false)
+  const [detailUuid,   setDetailUuid]   = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -44,16 +46,20 @@ export function HospitalManagement() {
 
   return (
     <div className="flex flex-col h-full">
-      <Header title="Hospitals" subtitle="Registered hospitals and their schedulers" />
+      <Header title="Hospitals" subtitle="Manage hospital registrations" />
 
       <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
+
+        <div className="flex justify-end">
+          <button className="btn-brand" onClick={() => setShowCreate(true)}>+ New Hospital</button>
+        </div>
 
         {loading && <p className="text-sm text-gray-400">Loading…</p>}
         {error   && <p className="text-sm text-red-500">{error}</p>}
 
         {!loading && !error && hospitals.length === 0 && (
           <div className="card p-8 text-center text-gray-400">
-            <p className="text-sm">No hospitals registered yet. Invite a Scheduler to add the first one.</p>
+            <p className="text-sm">No hospitals registered yet.</p>
           </div>
         )}
 
@@ -97,7 +103,7 @@ export function HospitalManagement() {
                     <td className="px-4 py-3">
                       <button
                         className="text-xs font-medium text-brand-600 hover:underline"
-                        onClick={() => navigate(`/hospitals/${h.uuid}`)}
+                        onClick={() => setDetailUuid(h.uuid)}
                       >
                         View →
                       </button>
@@ -110,6 +116,24 @@ export function HospitalManagement() {
         )}
 
       </div>
+
+      {showCreate && (
+        <CreateHospitalOverlay
+          onClose={() => setShowCreate(false)}
+          onCreated={(h) => { setHospitals((prev) => [h, ...prev]); setShowCreate(false) }}
+        />
+      )}
+
+      {detailUuid && (
+        <HospitalDetailOverlay
+          uuid={detailUuid}
+          onClose={() => setDetailUuid(null)}
+          onSaved={(updated) => {
+            setHospitals((prev) => prev.map((h) => h.uuid === updated.uuid ? updated : h))
+            setDetailUuid(null)
+          }}
+        />
+      )}
     </div>
   )
 }

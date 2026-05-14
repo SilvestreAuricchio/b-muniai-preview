@@ -27,3 +27,4 @@ export function InsightCard({ label, value, detail, accent = false, icon }: Prop
     </div>
   )
 }
+

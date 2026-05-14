@@ -11,14 +11,20 @@ const navItems = [
 ]
 
 const adminOnly = [
-  { to: '/crud/hospitals',   label: 'Hospitals' },
-  { to: '/crud/users',       label: 'Users' },
+  { to: '/hospitals',        label: 'Hospitals' },
+  { to: '/users',            label: 'Users' },
+  { to: '/medicineres',      label: 'Medicineres' },
   { to: '/crud/departments', label: 'Departments' },
+]
+
+const schedulerOnly = [
+  { to: '/slots', label: 'Slots' },
 ]
 
 export function Sidebar() {
   const { user, logout } = useAuth()
-  const isSA = user?.role === 'SA-root'
+  const isSA        = user?.role === 'SA-root'
+  const isScheduler = user?.role === 'Scheduler'
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -70,6 +76,30 @@ export function Sidebar() {
               Admin
             </div>
             {adminOnly.map(({ to, label }) => (
+              <NavLink
+                key={to}
+                to={to}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                    isActive
+                      ? 'bg-brand-50 text-brand-700'
+                      : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800'
+                  }`
+                }
+              >
+                <span className="ml-2 h-1.5 w-1.5 rounded-full bg-gray-300 flex-shrink-0" />
+                {label}
+              </NavLink>
+            ))}
+          </>
+        )}
+
+        {isScheduler && (
+          <>
+            <div className="mt-4 mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+              Scheduler
+            </div>
+            {schedulerOnly.map(({ to, label }) => (
               <NavLink
                 key={to}
                 to={to}

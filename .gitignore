@@ -6,3 +6,10 @@ services/bff/.env
 infra/docker/certs/
 **/__pycache__/
 **/*.pyc
+ecrets.txt
+
+# Persistent data directories (bind mounts — host-level storage)
+data/postgres/
+data/mongodb/
+data/prometheus/
+    

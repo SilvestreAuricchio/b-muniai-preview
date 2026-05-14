@@ -41,8 +41,9 @@ services:
       PORT: "30001"
       BACKEND_URL: http://backend:30002
       REDIS_URL: redis://redis:6379/1
-      GOOGLE_REDIRECT_URI: "https://localhost/bff/auth/google/callback"
+      INVITE_TOKEN_REDIS_URL: redis://redis:6379/2
       APP_URL: "https://localhost"
+      APP_COUNTRY: "BR"
     depends_on:
       redis:
         condition: service_healthy
@@ -61,7 +62,9 @@ services:
       POSTGRES_URL: postgresql://muniai:muniai@postgres:5432/muniai
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       REDIS_URL: redis://redis:6379/0
+      INVITE_TOKEN_REDIS_URL: redis://redis:6379/2
       MONGODB_URL: mongodb://mongodb:27017/muniai
+      APP_COUNTRY: "BR"
     depends_on:
       postgres:
         condition: service_healthy
@@ -92,6 +95,21 @@ services:
       - muniai
     restart: unless-stopped
 
+  hospital-audit-worker:
+    build: ./services/backend
+    command: python -m src.infrastructure.messaging.hospital_audit_consumer
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      MONGODB_URL: mongodb://mongodb:27017/muniai
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mongodb:
+        condition: service_started
+    networks:
+      - muniai
+    restart: unless-stopped
+
   # log-consumer:                     # TODO: scaffold services/log-consumer
   #   build: ./services/log-consumer
   #   environment:
@@ -113,7 +131,7 @@ services:
       POSTGRES_USER:     muniai
       POSTGRES_PASSWORD: muniai
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -q -U muniai"]
       interval: 5s
@@ -128,7 +146,7 @@ services:
     expose:
       - "27017"
     volumes:
-      - mongodb_data:/data/db
+      - ./data/mongodb:/data/db
     networks:
       - muniai
 
@@ -170,7 +188,7 @@ services:
       - "9090"
     volumes:
       - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
+      - ./data/prometheus:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--web.external-url=/prometheus/"
@@ -195,13 +213,12 @@ services:
       - muniai
 
 # ── Named volumes ───────────────────────────────────────────────────────
+# postgres, mongodb, prometheus use bind mounts (./data/) for host-level persistence.
+# redis, rabbitmq, grafana, nginx_certs use named volumes (less critical to survive Docker resets).
 volumes:
   nginx_certs:
-  postgres_data:
-  mongodb_data:
   redis_data:
   rabbitmq_data:
-  prometheus_data:
   grafana_data:
 
 # ── Network ─────────────────────────────────────────────────────────────

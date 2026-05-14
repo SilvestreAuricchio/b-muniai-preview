@@ -73,7 +73,8 @@ def _on_message(
         channel.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
         return
 
-    _log.info("Dispatching OTP uuid=%s via %d channel(s)", uuid, len(senders))
+    base_url = payload.get("base_url", "")
+    _log.info("Dispatching OTP uuid=%s via %d channel(s) base_url=%r", uuid, len(senders), base_url)
 
     transient_failures: list[str] = []
     permanent_failures: list[str] = []
@@ -81,7 +82,7 @@ def _on_message(
     for sender in senders:
         name = type(sender).__name__
         try:
-            sender.send(uuid, email, telephone, otp, ttl_seconds)
+            sender.send(uuid, email, telephone, otp, ttl_seconds, base_url)
         except PermanentDeliveryError as exc:
             _log.error("Channel %s permanent failure uuid=%s: %s", name, uuid, exc)
             permanent_failures.append(name)
