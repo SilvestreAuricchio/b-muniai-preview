@@ -1,5 +1,5 @@
 from typing import Optional
-from src.domain.entities.user import User
+from src.domain.entities.user import User, InviteHistory
 from src.application.ports.user_repository import UserRepository
 
 
@@ -7,7 +7,8 @@ class InMemoryUserRepository(UserRepository):
     """Dev/test in-memory store. Replace with PostgresUserRepository in production."""
 
     def __init__(self) -> None:
-        self._store: dict[str, User] = {}
+        self._store:   dict[str, User]             = {}
+        self._history: dict[str, list[InviteHistory]] = {}
 
     def save(self, user: User) -> User:
         self._store[user.uuid] = user
@@ -27,3 +28,9 @@ class InMemoryUserRepository(UserRepository):
 
     def list_all(self) -> list[User]:
         return list(self._store.values())
+
+    def save_invite_history(self, record: InviteHistory) -> None:
+        self._history.setdefault(record.user_uuid, []).append(record)
+
+    def list_invite_history(self, user_uuid: str) -> list[InviteHistory]:
+        return sorted(self._history.get(user_uuid, []), key=lambda r: r.invited_at)

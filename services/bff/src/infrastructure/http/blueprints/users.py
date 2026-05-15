@@ -14,6 +14,7 @@ def _forward_headers() -> dict:
         "X-Correlation-ID": g.correlation_id,
         "X-Auth-Sub":       g.get("auth_sub",  ""),
         "X-Auth-Role":      g.get("auth_role", ""),
+        "X-App-Base-URL":   f"{request.scheme}://{request.host}",
         "Content-Type":     "application/json",
     }
 
@@ -125,6 +126,88 @@ def cancel_invitation(uuid: str):
     """
     _log.info("DELETE /users/%s/invitation  corr=%s", uuid, g.correlation_id)
     body, status = _backend().delete(f"/users/{uuid}/invitation", _forward_headers())
+    return jsonify(body), status
+
+
+@users_bp.post("/users/<uuid>/disable")
+def disable_user(uuid: str):
+    """
+    Disable an active user — temporary suspension
+    ---
+    tags: [users]
+    parameters:
+      - in: path
+        name: uuid
+        required: true
+        type: string
+    responses:
+      200: {description: User disabled}
+      404: {description: User not found}
+      422: {description: User is not active}
+    """
+    _log.info("POST /users/%s/disable  corr=%s", uuid, g.correlation_id)
+    body, status = _backend().post(f"/users/{uuid}/disable", {}, _forward_headers())
+    return jsonify(body), status
+
+
+@users_bp.post("/users/<uuid>/enable")
+def enable_user(uuid: str):
+    """
+    Re-enable a disabled user
+    ---
+    tags: [users]
+    parameters:
+      - in: path
+        name: uuid
+        required: true
+        type: string
+    responses:
+      200: {description: User re-enabled}
+      404: {description: User not found}
+      422: {description: User is not disabled}
+    """
+    _log.info("POST /users/%s/enable  corr=%s", uuid, g.correlation_id)
+    body, status = _backend().post(f"/users/{uuid}/enable", {}, _forward_headers())
+    return jsonify(body), status
+
+
+@users_bp.post("/users/<uuid>/deactivate")
+def deactivate_user(uuid: str):
+    """
+    Permanently deactivate an active or disabled user
+    ---
+    tags: [users]
+    parameters:
+      - in: path
+        name: uuid
+        required: true
+        type: string
+    responses:
+      200: {description: User deactivated}
+      404: {description: User not found}
+      422: {description: User cannot be deactivated}
+    """
+    _log.info("POST /users/%s/deactivate  corr=%s", uuid, g.correlation_id)
+    body, status = _backend().post(f"/users/{uuid}/deactivate", {}, _forward_headers())
+    return jsonify(body), status
+
+
+@users_bp.get("/users/<uuid>/history")
+def get_invite_history(uuid: str):
+    """
+    Return previous invitation cycles for a user (oldest first)
+    ---
+    tags: [users]
+    parameters:
+      - in: path
+        name: uuid
+        required: true
+        type: string
+    responses:
+      200: {description: List of past invite cycles}
+      404: {description: User not found}
+    """
+    body, status = _backend().get(f"/users/{uuid}/history", _forward_headers())
     return jsonify(body), status
 
 

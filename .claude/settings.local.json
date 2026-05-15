@@ -14,7 +14,17 @@
       "Bash(git push *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\porco\\\\tests\\\\b-muniai-preview\" -Directory)",
       "Bash(Select-Object Name)",
-      "Bash(xargs grep -l \"activation\\\\|otp\")"
+      "Bash(xargs grep -l \"activation\\\\|otp\")",
+      "Bash(Get-Content \"C:\\\\Users\\\\porco\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\S--Projetos-b-muniai-preview\\\\c685536b-2e10-49bc-80e4-d2d12959d8f3\\\\tasks\\\\b4a1jg7o2.output\" -Wait -Tail 6)",
+      "Bash(Select-Object -First 10)",
+      "PowerShell(docker compose *)",
+      "WebFetch(domain:www.gov.br)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.nfe.fazenda.gov.br)",
+      "Bash(Get-ChildItem *)",
+      "PowerShell(git *)",
+      "Bash(not exist *)"
     ]
   }
 }

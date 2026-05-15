@@ -4,6 +4,19 @@ from enum import Enum
 import uuid as _uuid
 
 
+
+
+@dataclass(frozen=True)
+class InviteHistory:
+    """Snapshot of one completed invitation cycle, written before reinvite() resets the user."""
+    id:               str
+    user_uuid:        str
+    invited_at:       datetime
+    otp_dispatched_at: datetime | None = None
+    otp_verified_at:   datetime | None = None
+    activated_at:      datetime | None = None
+
+
 class UserRole(str, Enum):
     SA_ROOT   = "SA-root"
     SCHEDULER = "Scheduler"
@@ -14,6 +27,7 @@ class UserStatus(str, Enum):
     PENDING          = "pending"
     PENDING_APPROVAL = "pending_approval"
     ACTIVE           = "active"
+    DISABLED         = "disabled"
     INACTIVE         = "inactive"
 
 
@@ -29,6 +43,7 @@ class User:
     otp_dispatched_at: datetime | None = field(default=None)
     otp_verified_at:   datetime | None = field(default=None)
     activated_at:      datetime | None = field(default=None)
+    invite_token:      str | None      = field(default=None)
 
     @classmethod
     def create(cls, name: str, telephone: str, email: str, role: UserRole) -> "User":
@@ -39,6 +54,7 @@ class User:
             email=email,
             role=role,
             status=UserStatus.PENDING,
+            invite_token=str(_uuid.uuid4()),
         )
 
     def mark_otp_dispatched(self) -> None:
@@ -55,6 +71,7 @@ class User:
         self.otp_dispatched_at = None
         self.otp_verified_at   = None
         self.activated_at      = None
+        self.invite_token      = str(_uuid.uuid4())
 
     def verify_otp(self) -> None:
         if self.status != UserStatus.PENDING:
@@ -68,7 +85,18 @@ class User:
         self.status       = UserStatus.ACTIVE
         self.activated_at = datetime.now(timezone.utc)
 
+    def disable(self) -> None:
+        if self.status != UserStatus.ACTIVE:
+            raise ValueError(f"Can only disable an active user, current status: '{self.status.value}'")
+        self.status = UserStatus.DISABLED
+
+    def enable(self) -> None:
+        if self.status != UserStatus.DISABLED:
+            raise ValueError(f"Can only re-enable a disabled user, current status: '{self.status.value}'")
+        self.status = UserStatus.ACTIVE
+
     def deactivate(self) -> None:
-        if self.status not in (UserStatus.PENDING, UserStatus.PENDING_APPROVAL):
-            raise ValueError(f"Cannot cancel invitation with status '{self.status.value}'")
+        if self.status not in (UserStatus.PENDING, UserStatus.PENDING_APPROVAL,
+                               UserStatus.ACTIVE, UserStatus.DISABLED):
+            raise ValueError(f"Cannot deactivate user with status '{self.status.value}'")
         self.status = UserStatus.INACTIVE

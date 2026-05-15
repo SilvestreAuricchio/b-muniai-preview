@@ -10,7 +10,7 @@ export default defineConfig({
       '/bff': { target: 'http://localhost:30001', changeOrigin: true },
     },
   },
-  preview: { port: 30000, host: '0.0.0.0' },
+  preview: { port: 30000, host: '0.0.0.0', allowedHosts: ['muninai.com.aw'] },
   resolve: {
     alias: { '@': resolve(__dirname, 'src') },
   },

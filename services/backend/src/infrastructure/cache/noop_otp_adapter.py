@@ -15,7 +15,7 @@ class NoOpOTPAdapter(ChallengePort):
     def __init__(self) -> None:
         self._store: dict[str, dict] = {}
 
-    def issue(self, uuid, email, telephone, otp, psa_uuid, ttl_seconds) -> None:
+    def issue(self, uuid, email, telephone, otp, psa_uuid, ttl_seconds, base_url: str = "") -> None:
         self._store[uuid] = {
             "otp":      otp,
             "psa_uuid": psa_uuid,
